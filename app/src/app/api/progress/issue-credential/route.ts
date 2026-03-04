@@ -54,16 +54,32 @@ export async function POST(request: NextRequest) {
       throw new ApiError(ApiErrorCode.INVALID_INPUT, "Invalid or missing learner address");
     }
 
+    // Verify session identity matches the learner wallet
+    const sessionWallet = session.user?.walletAddress;
+    const linkedWallet = request.cookies.get("academy_linked_wallet")?.value;
+    const userWallet = sessionWallet || linkedWallet;
+    if (!userWallet || userWallet !== learner) {
+      throw new ApiError(ApiErrorCode.FORBIDDEN, "Wallet does not match authenticated session");
+    }
+
     if (!trackCollectionStr || typeof trackCollectionStr !== "string") {
       throw new ApiError(ApiErrorCode.INVALID_INPUT, "Invalid or missing trackCollection");
     }
 
-    if (!credentialName || typeof credentialName !== "string") {
-      throw new ApiError(ApiErrorCode.INVALID_INPUT, "Invalid or missing credentialName");
+    if (!credentialName || typeof credentialName !== "string" || credentialName.length > 100) {
+      throw new ApiError(ApiErrorCode.INVALID_INPUT, "Invalid credentialName");
     }
 
-    if (!metadataUri || typeof metadataUri !== "string") {
-      throw new ApiError(ApiErrorCode.INVALID_INPUT, "Invalid or missing metadataUri");
+    if (!metadataUri || typeof metadataUri !== "string" || metadataUri.length > 200) {
+      throw new ApiError(ApiErrorCode.INVALID_INPUT, "Invalid metadataUri");
+    }
+    try {
+      const url = new URL(metadataUri);
+      if (!["https:"].includes(url.protocol)) {
+        throw new Error("Invalid protocol");
+      }
+    } catch {
+      throw new ApiError(ApiErrorCode.INVALID_INPUT, "metadataUri must be a valid HTTPS URL");
     }
 
     if (typeof coursesCompleted !== "number" || !Number.isInteger(coursesCompleted) || coursesCompleted < 1) {

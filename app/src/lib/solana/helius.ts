@@ -21,6 +21,8 @@ export interface HeliusAsset {
 export interface TokenHolder {
   owner: string;
   amount: number;
+  /** Unix timestamp (ms) of the holder's last on-chain activity, if available. */
+  lastActive?: number;
 }
 
 export function getHeliusRpcUrl(): string {

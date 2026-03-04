@@ -19,6 +19,32 @@ import {
   Star,
   Timer,
   Lock,
+  Award,
+  Search,
+  TrendingUp,
+  Layers,
+  Package,
+  BookCheck,
+  Medal,
+  Gauge,
+  Rocket,
+  Sparkles,
+  CalendarCheck,
+  Shield,
+  Coins,
+  Sword,
+  Gem,
+  BadgeCheck,
+  Wallet,
+  ShieldCheck,
+  Briefcase,
+  Megaphone,
+  Share2,
+  Users,
+  Compass,
+  Globe,
+  Sparkle,
+  Bolt,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -26,6 +52,7 @@ import {
   ACHIEVEMENT_DEFINITIONS,
   CATEGORIES,
   isAchievementUnlocked,
+  getAchievementUnlockedAt,
   type AchievementCategory,
   type AchievementDefinition,
 } from "@/lib/gamification/achievements";
@@ -47,6 +74,32 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string; "aria-h
   Heart,
   Star,
   Timer,
+  Award,
+  Search,
+  TrendingUp,
+  Layers,
+  Package,
+  BookCheck,
+  Medal,
+  Gauge,
+  Rocket,
+  Sparkles,
+  CalendarCheck,
+  Shield,
+  Coins,
+  Sword,
+  Gem,
+  BadgeCheck,
+  Wallet,
+  ShieldCheck,
+  Briefcase,
+  Megaphone,
+  Share2,
+  Users,
+  Compass,
+  Globe,
+  Sparkle,
+  Bolt,
 };
 
 // Category background colors for unlocked badges
@@ -56,6 +109,7 @@ const CATEGORY_BG: Record<AchievementCategory, string> = {
   skills: "from-green-500/20 to-green-500/5 border-green-500/30",
   community: "from-purple-500/20 to-purple-500/5 border-purple-500/30",
   special: "from-yellow-500/20 to-yellow-500/5 border-yellow-500/30",
+  xp: "from-cyan-500/20 to-cyan-500/5 border-cyan-500/30",
 };
 
 const CATEGORY_GLOW: Record<AchievementCategory, string> = {
@@ -64,6 +118,7 @@ const CATEGORY_GLOW: Record<AchievementCategory, string> = {
   skills: "drop-shadow-[0_0_8px_rgba(34,197,94,0.5)]",
   community: "drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]",
   special: "drop-shadow-[0_0_8px_rgba(234,179,8,0.5)]",
+  xp: "drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]",
 };
 
 const CATEGORY_HEADER_ACCENT: Record<AchievementCategory, string> = {
@@ -72,6 +127,7 @@ const CATEGORY_HEADER_ACCENT: Record<AchievementCategory, string> = {
   skills: "bg-green-500",
   community: "bg-purple-500",
   special: "bg-yellow-500",
+  xp: "bg-cyan-500",
 };
 
 interface BadgeTileProps {
@@ -79,15 +135,29 @@ interface BadgeTileProps {
   unlocked: boolean;
 }
 
+/** Format "Earned X days ago" label from a unix ms timestamp. Returns null if timestamp is absent. */
+function formatEarnedLabel(achievementId: string, unlocked: boolean, t: ReturnType<typeof useTranslations<"achievements">>): string | null {
+  if (!unlocked) return null;
+  const ts = getAchievementUnlockedAt(achievementId);
+  if (!ts) return null;
+  const days = Math.floor((Date.now() - ts) / 86400000);
+  if (days === 0) return t("earnedToday");
+  return t("earnedDaysAgo", { days });
+}
+
 const BadgeTile = memo(function BadgeTile({ achievement, unlocked }: BadgeTileProps) {
   const t = useTranslations("achievements");
   const IconComponent = ICON_MAP[achievement.icon];
   const categoryColor = CATEGORIES.find((c) => c.key === achievement.category)?.color ?? "text-primary";
+  const earnedLabel = formatEarnedLabel(achievement.id, unlocked, t);
+
+  const hasCap = achievement.supplyCap !== undefined;
+  const claimed = achievement.supplyClaimed ?? 0;
 
   return (
     <div
       className={cn(
-        "relative flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all duration-200",
+        "relative flex flex-col items-center gap-2 rounded-xl border p-3 sm:p-4 text-center transition-all duration-200 min-w-0 overflow-hidden",
         unlocked
           ? cn(
               "bg-gradient-to-br",
@@ -128,7 +198,7 @@ const BadgeTile = memo(function BadgeTile({ achievement, unlocked }: BadgeTilePr
       </div>
 
       {/* Name */}
-      <p className={cn("text-xs font-semibold leading-tight", unlocked ? "" : "text-muted-foreground")}>
+      <p className={cn("text-xs font-semibold leading-tight line-clamp-1", unlocked ? "" : "text-muted-foreground")} title={t(`badges.${achievement.id}.name` as never)}>
         {t(`badges.${achievement.id}.name` as never)}
       </p>
 
@@ -137,11 +207,23 @@ const BadgeTile = memo(function BadgeTile({ achievement, unlocked }: BadgeTilePr
         {t(`badges.${achievement.id}.description` as never)}
       </p>
 
-      {/* XP reward */}
+      {/* XP reward + earned date */}
       {unlocked && (
-        <Badge variant="outline" className={cn("mt-auto text-[10px] px-1.5 py-0", categoryColor)}>
-          +{achievement.xpReward} {t("xpReward")}
-        </Badge>
+        <div className="mt-auto flex flex-col items-center gap-1">
+          <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", categoryColor)}>
+            +{achievement.xpReward} {t("xpReward")}
+          </Badge>
+          {earnedLabel && (
+            <span className="text-[10px] text-muted-foreground">{earnedLabel}</span>
+          )}
+        </div>
+      )}
+
+      {/* Supply cap info */}
+      {hasCap && (
+        <span className={cn("text-[10px]", unlocked ? "text-muted-foreground" : "text-muted-foreground/60")}>
+          {t("supplyClaimed", { claimed, cap: achievement.supplyCap ?? 0 })}
+        </span>
       )}
     </div>
   );
@@ -196,8 +278,8 @@ export const AchievementBadges = memo(function AchievementBadges({ unlockedBitma
               className={cn(
                 "grid gap-3",
                 compact
-                  ? "grid-cols-3 sm:grid-cols-5"
-                  : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+                  ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+                  : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
               )}
             >
               {badges.map((achievement) => (

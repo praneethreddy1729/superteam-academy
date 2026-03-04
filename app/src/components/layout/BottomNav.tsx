@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/routing";
-import { BookOpen, LayoutDashboard, Trophy, Users } from "lucide-react";
+import { BookOpen, LayoutDashboard, Award, Trophy, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function BottomNav() {
@@ -12,6 +12,7 @@ export function BottomNav() {
   const items = [
     { href: "/courses" as const, label: t("courses"), icon: BookOpen },
     { href: "/dashboard" as const, label: t("dashboard"), icon: LayoutDashboard },
+    { href: "/certificates" as const, label: t("certificates"), icon: Award },
     { href: "/leaderboard" as const, label: t("leaderboard"), icon: Trophy },
     { href: "/community" as const, label: t("community"), icon: Users },
   ];

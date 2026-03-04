@@ -267,6 +267,14 @@ export function Sidebar() {
             <ThemeToggle />
           </div>
         </div>
+
+        {/* IDE-style status bar */}
+        <div className="px-3 py-2 border-t border-border/30 bg-background/50 shrink-0">
+          <div className="flex items-center justify-between text-xs font-mono text-muted-foreground">
+            <span className="text-[#14F195]/70">● devnet</span>
+            {!collapsed && <span>Solana Academy</span>}
+          </div>
+        </div>
       </aside>
 
     </TooltipProvider>

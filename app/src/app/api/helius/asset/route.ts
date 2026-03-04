@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import { PublicKey } from "@solana/web3.js";
+import { auth } from "@/lib/auth/config";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getHeliusRpcUrl } from "@/lib/solana/helius";
 import { ApiError, ApiErrorCode, apiErrorResponse, handleApiError } from "@/lib/api/errors";
 
-const PUBLIC_CACHE = "public, s-maxage=60, stale-while-revalidate=300";
+const PRIVATE_CACHE = "private, max-age=3600";
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      throw new ApiError(ApiErrorCode.UNAUTHORIZED, "Unauthorized");
+    }
+
     const ip =
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
 
@@ -70,7 +76,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(data.result, {
-      headers: { "Cache-Control": PUBLIC_CACHE },
+      headers: { "Cache-Control": PRIVATE_CACHE },
     });
   } catch (err: unknown) {
     return apiErrorResponse(handleApiError(err));

@@ -12,8 +12,8 @@ import {
 // ---------------------------------------------------------------------------
 
 describe("ACHIEVEMENT_DEFINITIONS — structure", () => {
-  it("has exactly 15 achievement definitions", () => {
-    expect(ACHIEVEMENT_DEFINITIONS).toHaveLength(15);
+  it("has at least 30 achievement definitions", () => {
+    expect(ACHIEVEMENT_DEFINITIONS.length).toBeGreaterThanOrEqual(30);
   });
 
   it("every definition has a unique id", () => {
@@ -28,10 +28,16 @@ describe("ACHIEVEMENT_DEFINITIONS — structure", () => {
     expect(unique.size).toBe(ACHIEVEMENT_DEFINITIONS.length);
   });
 
-  it("bitmapIndex values range from 0 to 14", () => {
+  it("bitmapIndex values start at 0", () => {
     const indices = ACHIEVEMENT_DEFINITIONS.map((a) => a.bitmapIndex);
     expect(Math.min(...indices)).toBe(0);
-    expect(Math.max(...indices)).toBe(14);
+  });
+
+  it("all bitmapIndex values are within the 256-bit bitmap range", () => {
+    for (const def of ACHIEVEMENT_DEFINITIONS) {
+      expect(def.bitmapIndex).toBeGreaterThanOrEqual(0);
+      expect(def.bitmapIndex).toBeLessThan(256);
+    }
   });
 
   it("every definition has a non-empty icon string", () => {
@@ -47,15 +53,27 @@ describe("ACHIEVEMENT_DEFINITIONS — structure", () => {
   });
 
   it("every definition has a valid category", () => {
-    const validCategories: AchievementCategory[] = ["progress", "streaks", "skills", "community", "special"];
+    const validCategories: AchievementCategory[] = ["progress", "streaks", "skills", "community", "special", "xp"];
     for (const def of ACHIEVEMENT_DEFINITIONS) {
       expect(validCategories).toContain(def.category);
+    }
+  });
+
+  it("every definition has a non-empty name", () => {
+    for (const def of ACHIEVEMENT_DEFINITIONS) {
+      expect(def.name.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it("every definition has a non-empty description", () => {
+    for (const def of ACHIEVEMENT_DEFINITIONS) {
+      expect(def.description.trim().length).toBeGreaterThan(0);
     }
   });
 });
 
 // ---------------------------------------------------------------------------
-// Category distribution — spec requires 3 per category
+// Category distribution
 // ---------------------------------------------------------------------------
 
 describe("ACHIEVEMENT_DEFINITIONS — category counts", () => {
@@ -63,32 +81,45 @@ describe("ACHIEVEMENT_DEFINITIONS — category counts", () => {
     return ACHIEVEMENT_DEFINITIONS.filter((a) => a.category === cat).length;
   }
 
-  it("has 3 progress achievements", () => {
-    expect(countByCategory("progress")).toBe(3);
+  it("has at least 3 progress achievements", () => {
+    expect(countByCategory("progress")).toBeGreaterThanOrEqual(3);
   });
 
-  it("has 3 streak achievements", () => {
-    expect(countByCategory("streaks")).toBe(3);
+  it("has at least 3 streak achievements", () => {
+    expect(countByCategory("streaks")).toBeGreaterThanOrEqual(3);
   });
 
-  it("has 3 skills achievements", () => {
-    expect(countByCategory("skills")).toBe(3);
+  it("has at least 3 skills achievements", () => {
+    expect(countByCategory("skills")).toBeGreaterThanOrEqual(3);
   });
 
-  it("has 3 community achievements", () => {
-    expect(countByCategory("community")).toBe(3);
+  it("has at least 3 community achievements", () => {
+    expect(countByCategory("community")).toBeGreaterThanOrEqual(3);
   });
 
-  it("has 3 special achievements", () => {
-    expect(countByCategory("special")).toBe(3);
+  it("has at least 3 special achievements", () => {
+    expect(countByCategory("special")).toBeGreaterThanOrEqual(3);
+  });
+
+  it("has at least 3 xp achievements", () => {
+    expect(countByCategory("xp")).toBeGreaterThanOrEqual(3);
+  });
+
+  it("all categories together cover all achievements", () => {
+    const allCategories: AchievementCategory[] = ["progress", "streaks", "skills", "community", "special", "xp"];
+    const total = allCategories.reduce(
+      (sum, cat) => sum + ACHIEVEMENT_DEFINITIONS.filter((a) => a.category === cat).length,
+      0
+    );
+    expect(total).toBe(ACHIEVEMENT_DEFINITIONS.length);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Specific achievement IDs match bounty spec names
+// Specific achievement IDs — original 15 bounty spec badges
 // ---------------------------------------------------------------------------
 
-describe("ACHIEVEMENT_DEFINITIONS — bounty spec badges", () => {
+describe("ACHIEVEMENT_DEFINITIONS — original bounty spec badges", () => {
   function findById(id: string): AchievementDefinition {
     const found = ACHIEVEMENT_DEFINITIONS.find((a) => a.id === id);
     if (!found) throw new Error(`Achievement not found: ${id}`);
@@ -196,6 +227,223 @@ describe("ACHIEVEMENT_DEFINITIONS — bounty spec badges", () => {
 });
 
 // ---------------------------------------------------------------------------
+// New achievements — learning milestones
+// ---------------------------------------------------------------------------
+
+describe("ACHIEVEMENT_DEFINITIONS — learning milestone achievements", () => {
+  function findById(id: string): AchievementDefinition {
+    const found = ACHIEVEMENT_DEFINITIONS.find((a) => a.id === id);
+    if (!found) throw new Error(`Achievement not found: ${id}`);
+    return found;
+  }
+
+  it("lesson_5 is a progress achievement", () => {
+    const a = findById("lesson_5");
+    expect(a.category).toBe("progress");
+    expect(a.xpReward).toBeGreaterThan(0);
+  });
+
+  it("lesson_10 is a progress achievement", () => {
+    const a = findById("lesson_10");
+    expect(a.category).toBe("progress");
+  });
+
+  it("lesson_25 is a progress achievement", () => {
+    const a = findById("lesson_25");
+    expect(a.category).toBe("progress");
+  });
+
+  it("lesson_50 is a progress achievement", () => {
+    const a = findById("lesson_50");
+    expect(a.category).toBe("progress");
+  });
+
+  it("course_3 is a progress achievement", () => {
+    const a = findById("course_3");
+    expect(a.category).toBe("progress");
+  });
+
+  it("course_5 is a progress achievement", () => {
+    const a = findById("course_5");
+    expect(a.category).toBe("progress");
+  });
+
+  it("course_10 is a progress achievement", () => {
+    const a = findById("course_10");
+    expect(a.category).toBe("progress");
+  });
+
+  it("quick_learner is a progress achievement", () => {
+    const a = findById("quick_learner");
+    expect(a.category).toBe("progress");
+  });
+
+  it("marathon_day is a progress achievement", () => {
+    const a = findById("marathon_day");
+    expect(a.category).toBe("progress");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// New achievements — streak milestones
+// ---------------------------------------------------------------------------
+
+describe("ACHIEVEMENT_DEFINITIONS — streak milestone achievements", () => {
+  function findById(id: string): AchievementDefinition {
+    const found = ACHIEVEMENT_DEFINITIONS.find((a) => a.id === id);
+    if (!found) throw new Error(`Achievement not found: ${id}`);
+    return found;
+  }
+
+  it("streak_3 is a streaks achievement", () => {
+    const a = findById("streak_3");
+    expect(a.category).toBe("streaks");
+  });
+
+  it("streak_14 is a streaks achievement", () => {
+    const a = findById("streak_14");
+    expect(a.category).toBe("streaks");
+  });
+
+  it("streak_60 is a streaks achievement", () => {
+    const a = findById("streak_60");
+    expect(a.category).toBe("streaks");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// New achievements — XP milestones
+// ---------------------------------------------------------------------------
+
+describe("ACHIEVEMENT_DEFINITIONS — XP milestone achievements", () => {
+  function findById(id: string): AchievementDefinition {
+    const found = ACHIEVEMENT_DEFINITIONS.find((a) => a.id === id);
+    if (!found) throw new Error(`Achievement not found: ${id}`);
+    return found;
+  }
+
+  it("xp_100 is an xp achievement", () => {
+    const a = findById("xp_100");
+    expect(a.category).toBe("xp");
+  });
+
+  it("xp_500 is an xp achievement", () => {
+    const a = findById("xp_500");
+    expect(a.category).toBe("xp");
+  });
+
+  it("xp_1000 is an xp achievement", () => {
+    const a = findById("xp_1000");
+    expect(a.category).toBe("xp");
+  });
+
+  it("xp_5000 is an xp achievement", () => {
+    const a = findById("xp_5000");
+    expect(a.category).toBe("xp");
+  });
+
+  it("xp_10000 is an xp achievement with xpReward 1000", () => {
+    const a = findById("xp_10000");
+    expect(a.category).toBe("xp");
+    expect(a.xpReward).toBe(1000);
+  });
+
+  it("xp milestones have strictly increasing xpReward values", () => {
+    const milestones = ["xp_100", "xp_500", "xp_1000", "xp_5000", "xp_10000"];
+    const rewards = milestones.map((id) => {
+      const found = ACHIEVEMENT_DEFINITIONS.find((a) => a.id === id);
+      if (!found) throw new Error(`Achievement not found: ${id}`);
+      return found.xpReward;
+    });
+    for (let i = 1; i < rewards.length; i++) {
+      expect(rewards[i]).toBeGreaterThan(rewards[i - 1]!);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// New achievements — credentials
+// ---------------------------------------------------------------------------
+
+describe("ACHIEVEMENT_DEFINITIONS — credential achievements", () => {
+  function findById(id: string): AchievementDefinition {
+    const found = ACHIEVEMENT_DEFINITIONS.find((a) => a.id === id);
+    if (!found) throw new Error(`Achievement not found: ${id}`);
+    return found;
+  }
+
+  it("first_credential is a skills achievement", () => {
+    const a = findById("first_credential");
+    expect(a.category).toBe("skills");
+  });
+
+  it("credential_3 is a skills achievement", () => {
+    const a = findById("credential_3");
+    expect(a.category).toBe("skills");
+  });
+
+  it("credential_5 is a skills achievement", () => {
+    const a = findById("credential_5");
+    expect(a.category).toBe("skills");
+  });
+
+  it("credential_10 is a skills achievement with xpReward 1500", () => {
+    const a = findById("credential_10");
+    expect(a.category).toBe("skills");
+    expect(a.xpReward).toBe(1500);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// New achievements — social / community
+// ---------------------------------------------------------------------------
+
+describe("ACHIEVEMENT_DEFINITIONS — social and community achievements", () => {
+  function findById(id: string): AchievementDefinition {
+    const found = ACHIEVEMENT_DEFINITIONS.find((a) => a.id === id);
+    if (!found) throw new Error(`Achievement not found: ${id}`);
+    return found;
+  }
+
+  it("first_post is a community achievement", () => {
+    const a = findById("first_post");
+    expect(a.category).toBe("community");
+  });
+
+  it("course_sharer is a community achievement", () => {
+    const a = findById("course_sharer");
+    expect(a.category).toBe("community");
+  });
+
+  it("mentor is a community achievement", () => {
+    const a = findById("mentor");
+    expect(a.category).toBe("community");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// New achievements — explorer
+// ---------------------------------------------------------------------------
+
+describe("ACHIEVEMENT_DEFINITIONS — explorer achievements", () => {
+  function findById(id: string): AchievementDefinition {
+    const found = ACHIEVEMENT_DEFINITIONS.find((a) => a.id === id);
+    if (!found) throw new Error(`Achievement not found: ${id}`);
+    return found;
+  }
+
+  it("category_explorer is a special achievement", () => {
+    const a = findById("category_explorer");
+    expect(a.category).toBe("special");
+  });
+
+  it("polyglot_learner is a special achievement", () => {
+    const a = findById("polyglot_learner");
+    expect(a.category).toBe("special");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // isAchievementUnlocked
 // ---------------------------------------------------------------------------
 
@@ -204,6 +452,7 @@ describe("isAchievementUnlocked — bitmap checks", () => {
     expect(isAchievementUnlocked(0n, 0)).toBe(false);
     expect(isAchievementUnlocked(0n, 7)).toBe(false);
     expect(isAchievementUnlocked(0n, 14)).toBe(false);
+    expect(isAchievementUnlocked(0n, 39)).toBe(false);
   });
 
   it("returns true for index 0 when bit 0 is set", () => {
@@ -233,28 +482,31 @@ describe("isAchievementUnlocked — bitmap checks", () => {
     expect(isAchievementUnlocked(bitmap, 14)).toBe(true);
   });
 
-  it("returns true for all indices when all 15 bits are set", () => {
-    const bitmap = (1n << 15n) - 1n;
-    for (let i = 0; i < 15; i++) {
-      expect(isAchievementUnlocked(bitmap, i)).toBe(true);
-    }
+  it("returns true for index 39 when bit 39 is set", () => {
+    const bitmap = 1n << 39n;
+    expect(isAchievementUnlocked(bitmap, 39)).toBe(true);
+  });
+
+  it("returns false for index 38 when only bit 39 is set", () => {
+    const bitmap = 1n << 39n;
+    expect(isAchievementUnlocked(bitmap, 38)).toBe(false);
   });
 
   it("correctly identifies multiple unlocked achievements simultaneously", () => {
-    const bitmap = (1n << 0n) | (1n << 5n) | (1n << 14n);
+    const bitmap = (1n << 0n) | (1n << 5n) | (1n << 14n) | (1n << 31n);
     expect(isAchievementUnlocked(bitmap, 0)).toBe(true);
     expect(isAchievementUnlocked(bitmap, 5)).toBe(true);
     expect(isAchievementUnlocked(bitmap, 14)).toBe(true);
+    expect(isAchievementUnlocked(bitmap, 31)).toBe(true);
     expect(isAchievementUnlocked(bitmap, 1)).toBe(false);
     expect(isAchievementUnlocked(bitmap, 7)).toBe(false);
   });
 
-  it("bitmap with all bits set except index 7 returns false for index 7", () => {
-    const allSet = (1n << 15n) - 1n;
-    const withoutSeven = allSet & ~(1n << 7n);
-    expect(isAchievementUnlocked(withoutSeven, 7)).toBe(false);
-    expect(isAchievementUnlocked(withoutSeven, 6)).toBe(true);
-    expect(isAchievementUnlocked(withoutSeven, 8)).toBe(true);
+  it("bitmap with all bits set returns true for all defined achievement indices", () => {
+    const allSet = (1n << 256n) - 1n;
+    for (const def of ACHIEVEMENT_DEFINITIONS) {
+      expect(isAchievementUnlocked(allSet, def.bitmapIndex)).toBe(true);
+    }
   });
 });
 
@@ -268,18 +520,18 @@ describe("ACHIEVEMENT_DEFINITIONS — category filtering", () => {
     expect(progress.every((a) => a.category === "progress")).toBe(true);
   });
 
-  it("filtering by streaks returns exactly 3 items", () => {
-    const streaks = ACHIEVEMENT_DEFINITIONS.filter((a) => a.category === "streaks");
-    expect(streaks).toHaveLength(3);
+  it("filtering by xp returns only xp achievements", () => {
+    const xpAchievements = ACHIEVEMENT_DEFINITIONS.filter((a) => a.category === "xp");
+    expect(xpAchievements.every((a) => a.category === "xp")).toBe(true);
   });
 
-  it("all categories together cover all 15 achievements", () => {
-    const allCategories: AchievementCategory[] = ["progress", "streaks", "skills", "community", "special"];
+  it("all categories together cover all achievements", () => {
+    const allCategories: AchievementCategory[] = ["progress", "streaks", "skills", "community", "special", "xp"];
     const total = allCategories.reduce(
       (sum, cat) => sum + ACHIEVEMENT_DEFINITIONS.filter((a) => a.category === cat).length,
       0
     );
-    expect(total).toBe(15);
+    expect(total).toBe(ACHIEVEMENT_DEFINITIONS.length);
   });
 });
 
@@ -288,8 +540,8 @@ describe("ACHIEVEMENT_DEFINITIONS — category filtering", () => {
 // ---------------------------------------------------------------------------
 
 describe("CATEGORIES — structure", () => {
-  it("has 5 categories", () => {
-    expect(CATEGORIES).toHaveLength(5);
+  it("has 6 categories", () => {
+    expect(CATEGORIES).toHaveLength(6);
   });
 
   it("includes all expected category keys", () => {
@@ -299,6 +551,7 @@ describe("CATEGORIES — structure", () => {
     expect(keys).toContain("skills");
     expect(keys).toContain("community");
     expect(keys).toContain("special");
+    expect(keys).toContain("xp");
   });
 
   it("every category has a non-empty color string", () => {
@@ -315,5 +568,10 @@ describe("CATEGORIES — structure", () => {
   it("streaks category uses orange color", () => {
     const streaks = CATEGORIES.find((c) => c.key === "streaks");
     expect(streaks?.color).toContain("orange");
+  });
+
+  it("xp category uses cyan color", () => {
+    const xpCat = CATEGORIES.find((c) => c.key === "xp");
+    expect(xpCat?.color).toContain("cyan");
   });
 });

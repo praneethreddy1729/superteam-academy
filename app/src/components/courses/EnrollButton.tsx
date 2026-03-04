@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useWallet, useAnchorWallet } from "@solana/wallet-adapter-react";
 import { useConnection } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useWalletModal } from "@/components/wallet/CustomWalletModalProvider";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,10 @@ import { buildEnrollTx } from "@/lib/solana/instructions";
 import { trackCourseEnroll } from "@/lib/analytics/events";
 import { useEnrollment } from "@/hooks/useEnrollment";
 import logger from "@/lib/logger";
+import { SOLANA_NETWORK } from "@/lib/solana/constants";
+
+const IS_DEVNET = SOLANA_NETWORK === "devnet";
+const FAUCET_URL = "https://faucet.solana.com";
 
 interface EnrollButtonProps {
   courseId: string;
@@ -71,7 +75,18 @@ export function EnrollButton({ courseId, courseSlug, prerequisiteCourseId, onEnr
       } else if (msg.includes("PrerequisiteNotMet")) {
         toast.error(t("enrollment.prerequisiteRequired"));
       } else if (msg.includes("insufficient funds") || msg.includes("Insufficient")) {
-        toast.error(t("enrollment.error"), { description: t("enrollment.errorInsufficientFunds") });
+        if (IS_DEVNET) {
+          toast.error(t("enrollment.error"), {
+            description: t("enrollment.errorInsufficientFundsDevnet"),
+            action: {
+              label: t("enrollment.getFaucetSol"),
+              onClick: () => window.open(FAUCET_URL, "_blank", "noopener,noreferrer"),
+            },
+            duration: 8000,
+          });
+        } else {
+          toast.error(t("enrollment.error"), { description: t("enrollment.errorInsufficientFunds") });
+        }
       } else {
         logger.error("Enrollment failed:", err);
         toast.error(t("enrollment.error"), { description: t("enrollment.errorFailed") });

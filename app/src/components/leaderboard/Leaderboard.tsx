@@ -2,21 +2,49 @@
 
 import { memo, useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
+import { useRouter, usePathname } from "@/i18n/routing";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { RefreshCw, Info, Star, Flame, Crown, Zap } from "lucide-react";
 import { getLevel, formatXp, truncateAddress } from "@/lib/utils";
 import logger from "@/lib/logger";
 import { useProgressStore } from "@/stores/progress-store";
 import type { TokenHolder } from "@/lib/solana/helius";
 
-const getAvatarColor = (address: string) => {
+const PROFILE_NAME_KEY = "superteam-profile-name";
+const PROFILE_AVATAR_KEY = "superteam-profile-avatar";
+
+function useProfileData() {
+  const [profileName, setProfileName] = useState("");
+  const [profileAvatar, setProfileAvatar] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setProfileName(localStorage.getItem(PROFILE_NAME_KEY) ?? "");
+      setProfileAvatar(localStorage.getItem(PROFILE_AVATAR_KEY) ?? "");
+    }
+  }, []);
+
+  return { profileName, profileAvatar };
+}
+
+const getAvatarGradient = (address: string) => {
   const hash = address.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const hue = hash % 360;
-  return `hsl(${hue}, 70%, 50%)`;
+  const hue1 = hash % 360;
+  const hue2 = (hue1 + 40) % 360;
+  return `linear-gradient(135deg, hsl(${hue1}, 70%, 45%), hsl(${hue2}, 70%, 60%))`;
 };
 
 type TimeFilter = "allTime" | "monthly" | "weekly";
@@ -27,6 +55,8 @@ interface PodiumEntryProps {
   entry: TokenHolder;
   rank: 1 | 2 | 3;
   isMe: boolean;
+  profileName?: string;
+  profileAvatar?: string;
 }
 
 const PODIUM_CONFIG = {
@@ -36,7 +66,7 @@ const PODIUM_CONFIG = {
     gradient: "from-yellow-400 to-amber-600",
     glowClass: "glow-gold",
     animClass: "podium-1st",
-    labelColor: "text-yellow-300",
+    labelColor: "text-yellow-600 dark:text-yellow-300",
     borderColor: "border-yellow-400/60",
     blockBg: "bg-gradient-to-t from-yellow-600 to-amber-500",
     rankLabel: "1st",
@@ -47,7 +77,7 @@ const PODIUM_CONFIG = {
     gradient: "from-slate-300 to-slate-500",
     glowClass: "glow-silver",
     animClass: "podium-2nd",
-    labelColor: "text-slate-300",
+    labelColor: "text-slate-500 dark:text-slate-300",
     borderColor: "border-slate-400/50",
     blockBg: "bg-gradient-to-t from-slate-600 to-slate-400",
     rankLabel: "2nd",
@@ -58,18 +88,19 @@ const PODIUM_CONFIG = {
     gradient: "from-amber-600 to-amber-800",
     glowClass: "glow-bronze",
     animClass: "podium-3rd",
-    labelColor: "text-amber-400",
+    labelColor: "text-amber-600 dark:text-amber-400",
     borderColor: "border-amber-600/50",
     blockBg: "bg-gradient-to-t from-amber-800 to-amber-600",
     rankLabel: "3rd",
   },
 } as const;
 
-function PodiumEntry({ entry, rank, isMe }: PodiumEntryProps) {
+function PodiumEntry({ entry, rank, isMe, profileName, profileAvatar }: PodiumEntryProps) {
   const cfg = PODIUM_CONFIG[rank];
-  const avatarColor = getAvatarColor(entry.owner);
+  const avatarGradient = getAvatarGradient(entry.owner);
   const avatarLabel = entry.owner.slice(0, 2).toUpperCase();
   const level = getLevel(entry.amount);
+  const displayName = isMe && profileName ? profileName : null;
 
   return (
     <div className={`flex flex-col items-center gap-2 ${cfg.order} ${cfg.animClass}`}>
@@ -82,21 +113,32 @@ function PodiumEntry({ entry, rank, isMe }: PodiumEntryProps) {
       )}
 
       {/* Avatar bubble */}
-      <div
-        className={`relative flex h-14 w-14 items-center justify-center rounded-full text-sm font-bold text-white ring-2 ${cfg.borderColor} shadow-lg`}
-        style={{ backgroundColor: avatarColor }}
-      >
-        {avatarLabel}
+      <div className={`relative ring-2 ${cfg.borderColor} shadow-lg rounded-full`}>
+        <Avatar className="h-14 w-14">
+          {isMe && profileAvatar && <AvatarImage src={profileAvatar} alt={profileName || entry.owner} />}
+          <AvatarFallback
+            className="text-sm font-bold text-white"
+            style={{ background: avatarGradient }}
+          >
+            {avatarLabel}
+          </AvatarFallback>
+        </Avatar>
         {isMe && (
           <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-primary border-2 border-background" />
         )}
       </div>
 
-      {/* Address + XP info */}
+      {/* Name/address + XP info */}
       <div className="flex flex-col items-center gap-1">
-        <span className="max-w-[80px] truncate font-mono text-xs text-foreground/80">
-          {truncateAddress(entry.owner, 4)}
-        </span>
+        {displayName ? (
+          <span className="max-w-[80px] truncate text-xs font-medium text-foreground/90">
+            {displayName}
+          </span>
+        ) : (
+          <span className="max-w-[80px] truncate font-mono text-xs text-foreground/80">
+            {truncateAddress(entry.owner, 4)}
+          </span>
+        )}
         <Badge
           className={`text-[10px] px-1.5 py-0 bg-gradient-to-r ${cfg.gradient} text-white border-0`}
         >
@@ -109,7 +151,7 @@ function PodiumEntry({ entry, rank, isMe }: PodiumEntryProps) {
 
       {/* Podium block */}
       <div
-        className={`w-24 ${cfg.height} ${cfg.blockBg} ${cfg.glowClass} rounded-t-lg flex items-start justify-center pt-2`}
+        className={`w-20 sm:w-24 ${cfg.height} ${cfg.blockBg} ${cfg.glowClass} rounded-t-lg flex items-start justify-center pt-2`}
       >
         <span className="text-xs font-bold text-white/90">{cfg.rankLabel}</span>
       </div>
@@ -124,12 +166,14 @@ interface LeaderboardRowProps {
   idx: number;
   isMe: boolean;
   streak?: number;
+  profileName?: string;
+  profileAvatar?: string;
 }
 
 function getRankColor(idx: number): string {
-  if (idx === 0) return "text-yellow-500 font-bold";
-  if (idx === 1) return "text-slate-400 font-bold";
-  if (idx === 2) return "text-amber-600 font-bold";
+  if (idx === 0) return "text-yellow-600 dark:text-yellow-500 font-bold";
+  if (idx === 1) return "text-slate-500 dark:text-slate-400 font-bold";
+  if (idx === 2) return "text-amber-700 dark:text-amber-600 font-bold";
   if (idx < 5)  return "text-primary/80 font-semibold";
   if (idx < 10) return "text-primary/50 font-medium";
   return "text-muted-foreground";
@@ -142,11 +186,12 @@ function getRowLeftBorder(idx: number): string {
   return "border-l-2 border-l-transparent";
 }
 
-const LeaderboardRow = memo(function LeaderboardRow({ entry, idx, isMe, streak }: LeaderboardRowProps) {
+const LeaderboardRow = memo(function LeaderboardRow({ entry, idx, isMe, streak, profileName, profileAvatar }: LeaderboardRowProps) {
   const t = useTranslations("leaderboard");
-  const avatarColor = getAvatarColor(entry.owner);
+  const avatarGradient = getAvatarGradient(entry.owner);
   const avatarLabel = entry.owner.slice(0, 2).toUpperCase();
   const level = getLevel(entry.amount);
+  const displayName = isMe && profileName ? profileName : null;
 
   const isTop3 = idx < 3;
   const evenRow = idx % 2 === 0;
@@ -156,7 +201,7 @@ const LeaderboardRow = memo(function LeaderboardRow({ entry, idx, isMe, streak }
       role="row"
       style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}
       className={[
-        "row-animate flex items-center gap-4 px-6 py-3.5 transition-colors",
+        "row-animate flex items-center gap-2 sm:gap-4 px-3 sm:px-6 py-3.5 transition-colors",
         getRowLeftBorder(idx),
         isTop3
           ? "bg-primary/5"
@@ -174,20 +219,34 @@ const LeaderboardRow = memo(function LeaderboardRow({ entry, idx, isMe, streak }
       </div>
 
       {/* Avatar */}
-      <div
-        role="cell"
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm"
-        style={{ backgroundColor: avatarColor }}
-        aria-hidden="true"
-      >
-        {avatarLabel}
+      <div role="cell" aria-hidden="true" className="shrink-0">
+        <Avatar className="h-8 w-8">
+          {isMe && profileAvatar && <AvatarImage src={profileAvatar} alt={profileName || entry.owner} />}
+          <AvatarFallback
+            className="text-xs font-bold text-white"
+            style={{ background: avatarGradient }}
+          >
+            {avatarLabel}
+          </AvatarFallback>
+        </Avatar>
       </div>
 
-      {/* Address */}
+      {/* Name / Address */}
       <div role="cell" className="flex flex-1 items-center gap-2 min-w-0">
-        <span className="truncate font-mono text-sm">
-          {truncateAddress(entry.owner, 6)}
-        </span>
+        {displayName ? (
+          <div className="min-w-0">
+            <span className="block truncate text-sm font-medium">
+              {displayName}
+            </span>
+            <span className="block truncate font-mono text-xs text-muted-foreground">
+              {truncateAddress(entry.owner, 6)}
+            </span>
+          </div>
+        ) : (
+          <span className="truncate font-mono text-sm">
+            {truncateAddress(entry.owner, 6)}
+          </span>
+        )}
         {isMe && (
           <Badge variant="secondary" className="shrink-0 text-xs">
             {t("you")}
@@ -205,11 +264,11 @@ const LeaderboardRow = memo(function LeaderboardRow({ entry, idx, isMe, streak }
       </div>
 
       {/* Level + XP */}
-      <div role="cell" className="flex shrink-0 items-center gap-3">
-        <Badge variant="outline" className={isTop3 ? "border-primary/40 text-primary" : ""}>
+      <div role="cell" className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+        <Badge variant="outline" className={`text-xs sm:text-sm ${isTop3 ? "border-primary/40 text-primary" : ""}`}>
           {t("level")} {level}
         </Badge>
-        <span className={`font-medium tabular-nums text-sm ${isTop3 ? "text-foreground" : "text-muted-foreground"}`}>
+        <span className={`font-medium tabular-nums text-xs sm:text-sm whitespace-nowrap ${isTop3 ? "text-foreground" : "text-muted-foreground"}`}>
           {formatXp(entry.amount)} XP
         </span>
       </div>
@@ -224,14 +283,44 @@ interface LeaderboardProps {
   courses?: { slug: string; title: string }[];
 }
 
-export function Leaderboard({ initialEntries = [] }: LeaderboardProps) {
+export function Leaderboard({ initialEntries = [], courses = [] }: LeaderboardProps) {
   const t = useTranslations("leaderboard");
   const { publicKey } = useWallet();
   const streakDays = useProgressStore((s) => s.streakDays);
-  const [holders, setHolders] = useState<TokenHolder[]>(initialEntries);
-  const [loading, setLoading] = useState(false);
+  const { profileName, profileAvatar } = useProfileData();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Read initial timeframe from URL (?tab=weekly|monthly|allTime)
+  const urlTab = searchParams.get("tab") as TimeFilter | null;
+  const validTabs: TimeFilter[] = ["allTime", "monthly", "weekly"];
+  const initialTab: TimeFilter =
+    urlTab && validTabs.includes(urlTab) ? urlTab : "allTime";
+
+  const [holders, setHolders] = useState<TokenHolder[]>(
+    initialTab === "allTime" ? initialEntries : []
+  );
+  const [loading, setLoading] = useState(initialTab !== "allTime");
   const [refreshing, setRefreshing] = useState(false);
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>("allTime");
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>(initialTab);
+  const [courseFilter, setCourseFilter] = useState<string>("all");
+
+  /** Update URL when tab changes without triggering a full navigation. */
+  const handleTabChange = useCallback(
+    (filter: TimeFilter) => {
+      setTimeFilter(filter);
+      const params = new URLSearchParams(searchParams.toString());
+      if (filter === "allTime") {
+        params.delete("tab");
+      } else {
+        params.set("tab", filter);
+      }
+      const query = params.toString();
+      router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
+    },
+    [router, pathname, searchParams]
+  );
 
   const fetchLeaderboard = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -289,13 +378,17 @@ export function Leaderboard({ initialEntries = [] }: LeaderboardProps) {
 
       {/* ── Total XP Counter ── */}
       {!loading && totalXp > 0 && (
-        <div className="mb-8 flex items-center justify-center gap-3 rounded-xl border border-yellow-500/20 bg-gradient-to-r from-yellow-500/5 via-amber-500/5 to-yellow-500/5 px-6 py-4 animate-fade-in">
-          <Zap className="h-5 w-5 text-yellow-400 shrink-0" aria-hidden="true" />
-          <span className="text-sm text-muted-foreground">Total Platform XP Earned</span>
-          <span className="xp-counter-glow font-mono text-2xl font-bold text-yellow-400 tabular-nums">
-            {formatXp(totalXp)}
-          </span>
-          <span className="text-sm font-medium text-yellow-500/70">XP</span>
+        <div className="mb-8 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 rounded-xl border border-yellow-500/20 bg-gradient-to-r from-yellow-500/5 via-amber-500/5 to-yellow-500/5 px-4 sm:px-6 py-3 sm:py-4 animate-fade-in">
+          <div className="flex items-center gap-2">
+            <Zap className="h-5 w-5 text-yellow-500 dark:text-yellow-400 shrink-0" aria-hidden="true" />
+            <span className="text-sm text-muted-foreground">Total Platform XP Earned</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="xp-counter-glow font-mono text-2xl font-bold text-yellow-500 dark:text-yellow-400 tabular-nums">
+              {formatXp(totalXp)}
+            </span>
+            <span className="text-sm font-medium text-yellow-600/70 dark:text-yellow-500/70">XP</span>
+          </div>
         </div>
       )}
 
@@ -305,16 +398,16 @@ export function Leaderboard({ initialEntries = [] }: LeaderboardProps) {
         <div
           role="group"
           aria-label={t("timeFilter")}
-          className="flex gap-1 rounded-lg border border-border bg-muted/40 p-1"
+          className="flex gap-1 rounded-lg border border-border bg-muted/40 p-1 overflow-x-auto"
         >
           {(["allTime", "monthly", "weekly"] as TimeFilter[]).map((filter) => (
             <button
               key={filter}
               role="tab"
               aria-selected={timeFilter === filter}
-              onClick={() => setTimeFilter(filter)}
+              onClick={() => handleTabChange(filter)}
               className={[
-                "rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-200",
+                "rounded-md px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap",
                 timeFilter === filter
                   ? "bg-background shadow-sm text-foreground"
                   : "text-muted-foreground hover:text-foreground",
@@ -325,6 +418,25 @@ export function Leaderboard({ initialEntries = [] }: LeaderboardProps) {
           ))}
         </div>
 
+        {/* Course filter — select dropdown */}
+        {courses.length > 0 && (
+          <Select value={courseFilter} onValueChange={setCourseFilter}>
+            <SelectTrigger
+              aria-label={t("courseFilter")}
+              className="h-9 w-full sm:w-[180px] border-border bg-muted/40 text-sm"
+            >
+              <SelectValue placeholder={t("filters.allCourses")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("filters.allCourses")}</SelectItem>
+              {courses.map((course) => (
+                <SelectItem key={course.slug} value={course.slug}>
+                  {course.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Filter notes */}
@@ -332,6 +444,12 @@ export function Leaderboard({ initialEntries = [] }: LeaderboardProps) {
         <p className="mb-4 flex items-center gap-1.5 rounded-md border border-border/50 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
           <Info className="h-3 w-3 shrink-0" aria-hidden="true" />
           {t("cumulativeNote")}
+        </p>
+      )}
+      {courseFilter !== "all" && (
+        <p className="mb-4 flex items-center gap-1.5 rounded-md border border-border/50 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          <Info className="h-3 w-3 shrink-0" aria-hidden="true" />
+          {t("courseFilterNote")}
         </p>
       )}
 
@@ -352,12 +470,12 @@ export function Leaderboard({ initialEntries = [] }: LeaderboardProps) {
             <CardContent className="p-0">
               <div className="divide-y divide-border/50">
                 {Array.from({ length: 7 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-4 px-6 py-4">
-                    <Skeleton className="h-5 w-8" />
-                    <Skeleton className="h-8 w-8 rounded-full" />
-                    <Skeleton className="h-4 flex-1" />
-                    <Skeleton className="h-6 w-24" />
-                    <Skeleton className="h-4 w-16" />
+                  <div key={i} className="flex items-center gap-2 sm:gap-4 px-3 sm:px-6 py-4">
+                    <Skeleton className="h-5 w-8 shrink-0" />
+                    <Skeleton className="h-8 w-8 rounded-full shrink-0" />
+                    <Skeleton className="h-4 flex-1 min-w-0" />
+                    <Skeleton className="h-6 w-16 sm:w-24 shrink-0" />
+                    <Skeleton className="h-4 w-12 sm:w-16 shrink-0 hidden sm:block" />
                   </div>
                 ))}
               </div>
@@ -371,8 +489,14 @@ export function Leaderboard({ initialEntries = [] }: LeaderboardProps) {
           <div className="animate-empty-float rounded-full bg-muted p-6 mb-4">
             <Star className="h-12 w-12 text-muted-foreground" aria-hidden="true" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">{t("empty")}</h3>
-          <p className="text-muted-foreground max-w-md">{t("emptyDescription")}</p>
+          <h3 className="text-lg font-semibold mb-2">
+            {timeFilter === "allTime" ? t("empty") : t("emptyPeriod")}
+          </h3>
+          <p className="text-muted-foreground max-w-md">
+            {timeFilter === "allTime"
+              ? t("emptyDescription")
+              : t("emptyPeriodDescription")}
+          </p>
         </div>
       ) : (
         <div>
@@ -380,7 +504,7 @@ export function Leaderboard({ initialEntries = [] }: LeaderboardProps) {
           {/* ── Podium (top 3) ── */}
           {top3.length > 0 && (
             <div
-              className="mb-10 flex items-end justify-center gap-4 px-4"
+              className="mb-10 flex items-end justify-center gap-2 sm:gap-4 px-2 sm:px-4"
               aria-label="Top 3 podium"
               role="region"
             >
@@ -389,6 +513,8 @@ export function Leaderboard({ initialEntries = [] }: LeaderboardProps) {
                   entry={top3[1]!}
                   rank={2}
                   isMe={!!(publicKey && top3[1]!.owner === publicKey.toBase58())}
+                  profileName={profileName}
+                  profileAvatar={profileAvatar}
                 />
               )}
               {top3.length >= 1 && (
@@ -396,6 +522,8 @@ export function Leaderboard({ initialEntries = [] }: LeaderboardProps) {
                   entry={top3[0]!}
                   rank={1}
                   isMe={!!(publicKey && top3[0]!.owner === publicKey.toBase58())}
+                  profileName={profileName}
+                  profileAvatar={profileAvatar}
                 />
               )}
               {top3.length >= 3 && (
@@ -403,6 +531,8 @@ export function Leaderboard({ initialEntries = [] }: LeaderboardProps) {
                   entry={top3[2]!}
                   rank={3}
                   isMe={!!(publicKey && top3[2]!.owner === publicKey.toBase58())}
+                  profileName={profileName}
+                  profileAvatar={profileAvatar}
                 />
               )}
             </div>
@@ -431,6 +561,8 @@ export function Leaderboard({ initialEntries = [] }: LeaderboardProps) {
                         idx={idx}
                         isMe={isMe}
                         streak={isMe ? streakDays : undefined}
+                        profileName={profileName}
+                        profileAvatar={profileAvatar}
                       />
                     );
                   })}
@@ -457,6 +589,8 @@ export function Leaderboard({ initialEntries = [] }: LeaderboardProps) {
                         idx={idx}
                         isMe={isMe}
                         streak={isMe ? streakDays : undefined}
+                        profileName={profileName}
+                        profileAvatar={profileAvatar}
                       />
                     );
                   })}

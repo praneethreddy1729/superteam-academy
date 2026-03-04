@@ -21,17 +21,22 @@ function typeIcon(type: NotificationType) {
   }
 }
 
-function timeAgo(timestamp: number): string {
-  const diff = Date.now() - timestamp;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
+function useTimeAgo() {
+  const t = useTranslations("notifications");
+  return (timestamp: number): string => {
+    const diff = Date.now() - timestamp;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return t("timeAgo.justNow");
+    if (mins < 60) return t("timeAgo.minutesAgo", { mins });
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return t("timeAgo.hoursAgo", { hours });
+    return t("timeAgo.daysAgo", { days: Math.floor(hours / 24) });
+  };
 }
 
 function NotificationItem({ notification, onRead }: { notification: AppNotification; onRead: (id: string) => void }) {
+  const t = useTranslations("notifications");
+  const timeAgo = useTimeAgo();
   return (
     <button
       type="button"
@@ -52,7 +57,7 @@ function NotificationItem({ notification, onRead }: { notification: AppNotificat
         <p className="mt-1 text-xs text-muted-foreground/60">{timeAgo(notification.timestamp)}</p>
       </div>
       {!notification.read && (
-        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" aria-label="Unread" />
+        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" aria-label={t("unread")} />
       )}
     </button>
   );
@@ -78,7 +83,7 @@ export function NotificationCenter() {
           {unreadCount > 0 && (
             <span
               className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground"
-              aria-label={`${unreadCount} unread`}
+              aria-label={t("unreadCount", { count: unreadCount })}
             >
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>

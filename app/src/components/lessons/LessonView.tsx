@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
@@ -9,15 +9,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
-import { CheckCircle2, Circle, Play, Clock, ChevronLeft, ChevronRight, Loader2, VideoIcon, List, Wallet, BookOpen, Code2, PanelLeft } from "lucide-react";
+import { CheckCircle2, Circle, Play, Clock, ChevronLeft, ChevronRight, Loader2, VideoIcon, List, Wallet, BookOpen, Code2, ChevronDown } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { useLessonComplete } from "@/hooks/useLessonComplete";
 import { useEnrollment } from "@/hooks/useEnrollment";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useWalletModal } from "@/components/wallet/CustomWalletModalProvider";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useProgressStore } from "@/stores/progress-store";
 import { RichContent } from "@/lib/sanity/portable-text";
@@ -27,7 +26,6 @@ import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useRouter } from "@/i18n/routing";
 import { ErrorBoundary } from "@/components/shared/error-boundary";
-// react-resizable-panels no longer needed — using tab-based layout
 import type { SanityLesson, SanityCourse } from "@/lib/sanity/queries";
 import { LessonCompleteOverlay } from "@/components/lessons/LessonCompleteOverlay";
 
@@ -73,6 +71,7 @@ function formatRemainingTime(totalMinutes: number): string {
 
 interface LessonListProps {
   lessons: SanityCourse["lessons"];
+  modules?: SanityCourse["modules"];
   courseSlug: string;
   activeLessonSlug: string;
   getCompleted: (lessonIndex: number) => boolean;
@@ -80,16 +79,83 @@ interface LessonListProps {
   showHeader?: boolean;
 }
 
-function LessonList({ lessons, courseSlug, activeLessonSlug, getCompleted, onSelect, showHeader }: LessonListProps) {
+function LessonItem({
+  lesson,
+  idx,
+  courseSlug,
+  activeLessonSlug,
+  getCompleted,
+  onSelect,
+  t,
+}: {
+  lesson: SanityCourse["lessons"][number];
+  idx: number;
+  courseSlug: string;
+  activeLessonSlug: string;
+  getCompleted: (lessonIndex: number) => boolean;
+  onSelect?: () => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const completed = getCompleted(lesson.lessonIndex);
+  const isActive = lesson.slug === activeLessonSlug;
+  const mins = lesson.estimatedMinutes ?? 0;
+  return (
+    <Link
+      key={lesson._id}
+      href={`/courses/${courseSlug}/lessons/${lesson.slug}`}
+      onClick={onSelect}
+      aria-label={`${idx + 1}. ${lesson.title} - ${completed ? t("lesson.completed") : t("lesson.notCompleted")}`}
+    >
+      <div
+        className={`flex items-start gap-2 rounded-lg py-2 pr-3 text-sm transition-colors ${isActive
+          ? "border-l-2 border-primary bg-primary/5 pl-2 text-primary"
+          : "border-l-2 border-transparent pl-2 hover:bg-muted"
+          }`}
+      >
+        <div className="mt-0.5 shrink-0">
+          {completed ? (
+            <CheckCircle2 className="h-4 w-4 text-green-500" aria-hidden="true" />
+          ) : isActive ? (
+            <Play className="h-4 w-4 fill-primary text-primary" aria-hidden="true" />
+          ) : (
+            <Circle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          )}
+        </div>
+        <div className="flex flex-1 flex-col gap-0.5 min-w-0">
+          <span className="truncate leading-snug">
+            {idx + 1}. {lesson.title}
+          </span>
+          {mins > 0 && (
+            <span className={`flex items-center gap-1 text-xs ${timeColor(mins)}`}>
+              <Clock className="h-3 w-3 shrink-0" aria-hidden="true" />
+              {mins}min
+            </span>
+          )}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function LessonList({ lessons, modules, courseSlug, activeLessonSlug, getCompleted, onSelect, showHeader }: LessonListProps) {
   const t = useTranslations("courses");
 
-  const completedCount = lessons.filter((l) => getCompleted(l.lessonIndex)).length;
-  const totalCount = lessons.length;
+  const allLessonsForProgress = modules && modules.length > 0
+    ? modules.flatMap(m => m.lessons ?? [])
+    : lessons;
+
+  const completedCount = allLessonsForProgress.filter((l) => getCompleted(l.lessonIndex)).length;
+  const totalCount = allLessonsForProgress.length;
   const completedPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
-  const remainingMinutes = lessons
+  const remainingMinutes = allLessonsForProgress
     .filter((l) => !getCompleted(l.lessonIndex))
     .reduce((sum, l) => sum + (l.estimatedMinutes ?? 0), 0);
+
+  // Determine which module contains the active lesson (for default-open state)
+  const activeModuleIndex = modules
+    ? modules.findIndex(m => (m.lessons ?? []).some(l => l.slug === activeLessonSlug))
+    : -1;
 
   return (
     <div>
@@ -97,58 +163,67 @@ function LessonList({ lessons, courseSlug, activeLessonSlug, getCompleted, onSel
         <div className="mb-3 px-3 space-y-2">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>
-              {completedCount} of {totalCount} lessons
+              {t("lesson.lessonsProgress", { completed: completedCount, total: totalCount })}
             </span>
             {remainingMinutes > 0 && (
-              <span>{formatRemainingTime(remainingMinutes)} remaining</span>
+              <span>{t("lesson.timeRemaining", { time: formatRemainingTime(remainingMinutes) })}</span>
             )}
           </div>
           <Progress value={completedPercent} className="h-1.5" />
         </div>
       )}
-      <div className="space-y-0.5">
-        {lessons.map((l, idx) => {
-          const completed = getCompleted(l.lessonIndex);
-          const isActive = l.slug === activeLessonSlug;
-          const mins = l.estimatedMinutes ?? 0;
-          return (
-            <Link
+
+      {modules && modules.length > 0 ? (
+        // Module-grouped layout
+        <div className="space-y-1">
+          {modules.map((mod, modIdx) => {
+            const modLessons = mod.lessons ?? [];
+            const modCompleted = modLessons.filter(l => getCompleted(l.lessonIndex)).length;
+            const isActiveModule = modIdx === activeModuleIndex;
+            // Compute global lesson offset for correct numbering
+            const lessonOffset = modules.slice(0, modIdx).reduce((sum, m) => sum + (m.lessons ?? []).length, 0);
+            return (
+              <details key={mod._id} open={isActiveModule} className="group">
+                <summary className="flex cursor-pointer select-none list-none items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:bg-muted [&::-webkit-details-marker]:hidden">
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform group-open:rotate-0 -rotate-90" aria-hidden="true" />
+                  <span className="flex-1 truncate">{mod.title}</span>
+                  <span className="shrink-0 tabular-nums">{modCompleted}/{modLessons.length}</span>
+                </summary>
+                <div className="space-y-0.5 pl-2">
+                  {modLessons.map((l, idx) => (
+                    <LessonItem
+                      key={l._id}
+                      lesson={l}
+                      idx={lessonOffset + idx}
+                      courseSlug={courseSlug}
+                      activeLessonSlug={activeLessonSlug}
+                      getCompleted={getCompleted}
+                      onSelect={onSelect}
+                      t={t}
+                    />
+                  ))}
+                </div>
+              </details>
+            );
+          })}
+        </div>
+      ) : (
+        // Flat list fallback
+        <div className="space-y-0.5">
+          {lessons.map((l, idx) => (
+            <LessonItem
               key={l._id}
-              href={`/courses/${courseSlug}/lessons/${l.slug}`}
-              onClick={onSelect}
-              aria-label={`${idx + 1}. ${l.title} - ${completed ? t("lesson.completed") : t("lesson.notCompleted")}`}
-            >
-              <div
-                className={`flex items-start gap-2 rounded-lg py-2 pr-3 text-sm transition-colors ${isActive
-                  ? "border-l-2 border-primary bg-primary/5 pl-2 text-primary"
-                  : "border-l-2 border-transparent pl-2 hover:bg-muted"
-                  }`}
-              >
-                <div className="mt-0.5 shrink-0">
-                  {completed ? (
-                    <CheckCircle2 className="h-4 w-4 text-green-500" aria-hidden="true" />
-                  ) : isActive ? (
-                    <Play className="h-4 w-4 fill-primary text-primary" aria-hidden="true" />
-                  ) : (
-                    <Circle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                  )}
-                </div>
-                <div className="flex flex-1 flex-col gap-0.5 min-w-0">
-                  <span className="truncate leading-snug">
-                    {idx + 1}. {l.title}
-                  </span>
-                  {mins > 0 && (
-                    <span className={`flex items-center gap-1 text-xs ${timeColor(mins)}`}>
-                      <Clock className="h-3 w-3 shrink-0" aria-hidden="true" />
-                      {mins}min
-                    </span>
-                  )}
-                </div>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
+              lesson={l}
+              idx={idx}
+              courseSlug={courseSlug}
+              activeLessonSlug={activeLessonSlug}
+              getCompleted={getCompleted}
+              onSelect={onSelect}
+              t={t}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -171,16 +246,9 @@ export function LessonView({ lesson, course }: LessonViewProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [celebrationOpen, setCelebrationOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("lesson");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  const handleTabChange = useCallback((value: string) => {
-    setActiveTab(value);
-    // Auto-collapse sidebar when switching to challenge tab for max editor space
-    setSidebarCollapsed(value === "challenge");
-  }, []);
 
   const router = useRouter();
-  const allLessons = course.lessons.length > 0
+  const allLessons = (course.lessons ?? []).length > 0
     ? course.lessons
     : (course.modules ?? []).flatMap(m => m.lessons ?? []);
   const lessons = allLessons;
@@ -190,8 +258,6 @@ export function LessonView({ lesson, course }: LessonViewProps) {
   const prevLesson = currentIndex > 0 ? allLessons[currentIndex - 1] : null;
   const nextLesson = currentIndex < allLessons.length - 1 ? allLessons[currentIndex + 1] : null;
 
-  // N/P keyboard shortcuts for lesson navigation
-  // Safe to pass inline because the hook uses a ref to always call the latest handler
   useKeyboardShortcuts([
     {
       key: "n",
@@ -211,7 +277,6 @@ export function LessonView({ lesson, course }: LessonViewProps) {
     },
   ]);
 
-  // Derive completion state: optimistic store wins (instant feedback), then on-chain bitmap
   const getLessonCompleted = (lessonIndex: number): boolean => {
     if (isLessonCompleteOptimistic(course.onChainCourseId, lessonIndex)) return true;
     if (enrollment?.lessonFlags) {
@@ -233,6 +298,8 @@ export function LessonView({ lesson, course }: LessonViewProps) {
         lessonIndex: lesson.lessonIndex,
         lessonTitle: lesson.title,
         xpPerLesson: course.xpPerLesson,
+        totalLessons: lessons.length,
+        trackId: course.trackId != null ? String(course.trackId) : undefined,
       });
       showXPToast(course.xpPerLesson);
       setCelebrationOpen(true);
@@ -243,7 +310,7 @@ export function LessonView({ lesson, course }: LessonViewProps) {
 
   // Lesson content panel (shared between split and full-width layouts)
   const lessonContent = (
-    <div className="mx-auto max-w-3xl px-6 py-8">
+    <div className="mx-auto max-w-3xl px-4 sm:px-6 py-6 sm:py-8">
       {/* Breadcrumbs */}
       <Breadcrumbs
         ariaLabel={tc("breadcrumb")}
@@ -278,6 +345,7 @@ export function LessonView({ lesson, course }: LessonViewProps) {
               <ScrollArea className="h-[calc(100vh-12rem)]">
                 <LessonList
                   lessons={lessons}
+                  modules={course.modules}
                   courseSlug={courseSlug}
                   activeLessonSlug={lessonSlug}
                   getCompleted={getLessonCompleted}
@@ -308,7 +376,7 @@ export function LessonView({ lesson, course }: LessonViewProps) {
         )}
       </div>
 
-      <h1 className="mb-8 text-3xl font-bold">{lesson.title}</h1>
+      <h1 className="mb-6 sm:mb-8 text-2xl sm:text-3xl font-bold">{lesson.title}</h1>
 
       {/* Video embed */}
       {lesson.videoUrl && isValidVideoUrl(lesson.videoUrl) && (
@@ -326,8 +394,8 @@ export function LessonView({ lesson, course }: LessonViewProps) {
       )}
 
       {/* Rich content from Sanity Portable Text */}
-      <div className="prose dark:prose-invert max-w-none">
-        {lesson.content?.length > 0 ? (
+      <div className="prose dark:prose-invert max-w-none overflow-x-auto">
+        {Array.isArray(lesson.content) && lesson.content.length > 0 ? (
           <RichContent content={lesson.content} />
         ) : (
           <p className="text-muted-foreground italic">{t("lesson.noContent")}</p>
@@ -398,13 +466,40 @@ export function LessonView({ lesson, course }: LessonViewProps) {
     </div>
   );
 
+  // Tab-based layout (used for all screen sizes)
+  const tabContent = lesson.challenge ? (
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="flex h-[calc(100vh-4rem)] flex-col">
+      <div className="shrink-0 border-b border-border/40 bg-background/80 backdrop-blur-sm px-4 pt-3 pb-0">
+        <TabsList className="h-10 w-auto">
+          <TabsTrigger value="lesson" className="gap-1.5 px-3 sm:gap-2 sm:px-4">
+            <BookOpen className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="truncate">{t("lesson.lessonTab")}</span>
+          </TabsTrigger>
+          <TabsTrigger value="challenge" className="gap-1.5 px-3 sm:gap-2 sm:px-4">
+            <Code2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="truncate">{t("lesson.challenge")}</span>
+            <span className="relative flex h-2 w-2 ml-1">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+            </span>
+          </TabsTrigger>
+        </TabsList>
+      </div>
+      <TabsContent value="lesson" className="flex-1 overflow-y-auto mt-0">
+        {lessonContent}
+      </TabsContent>
+      <TabsContent value="challenge" className="flex-1 overflow-hidden mt-0">
+        <ErrorBoundary>
+          <CodeChallenge challenge={lesson.challenge} />
+        </ErrorBoundary>
+      </TabsContent>
+    </Tabs>
+  ) : null;
+
   return (
     <div className="flex min-h-[calc(100vh-4rem)]">
-      {/* Desktop Sidebar — auto-collapses when Code Challenge tab is active */}
-      <aside
-        className={`hidden shrink-0 border-r border-border/40 lg:block transition-all duration-300 ease-in-out overflow-hidden ${sidebarCollapsed ? "w-0 border-r-0" : "w-72"
-          }`}
-      >
+      {/* Desktop Sidebar */}
+      <aside className="hidden shrink-0 w-72 border-r border-border/40 lg:block">
         <ScrollArea className="h-[calc(100vh-4rem)] w-72">
           <div className="p-4">
             <Link href={`/courses/${courseSlug}`}>
@@ -418,6 +513,7 @@ export function LessonView({ lesson, course }: LessonViewProps) {
             </p>
             <LessonList
               lessons={lessons}
+              modules={course.modules}
               courseSlug={courseSlug}
               activeLessonSlug={lessonSlug}
               getCompleted={getLessonCompleted}
@@ -427,57 +523,13 @@ export function LessonView({ lesson, course }: LessonViewProps) {
         </ScrollArea>
       </aside>
 
-      {/* Content area — tabbed when challenge exists, full-width otherwise */}
+      {/* Content area */}
       {lesson.challenge ? (
-        <div className="flex-1 overflow-hidden">
-          <Tabs value={activeTab} onValueChange={handleTabChange} className="flex h-[calc(100vh-4rem)] flex-col">
-            {/* Tab bar — sticky at top */}
-            <div className="shrink-0 border-b border-border/40 bg-background/80 backdrop-blur-sm px-4 pt-3 pb-0 flex items-end justify-between">
-              <TabsList className="h-10 w-full sm:w-auto">
-                <TabsTrigger value="lesson" className="gap-2 px-4">
-                  <BookOpen className="h-4 w-4" aria-hidden="true" />
-                  {t("lesson.lessonTab")}
-                </TabsTrigger>
-                <TabsTrigger value="challenge" className="gap-2 px-4">
-                  <Code2 className="h-4 w-4" aria-hidden="true" />
-                  {t("lesson.challenge")}
-                  {/* Pulsing dot alert */}
-                  <span className="relative flex h-2 w-2 ml-1">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-                  </span>
-                </TabsTrigger>
-              </TabsList>
-              {/* Sidebar toggle — visible when collapsed */}
-              {sidebarCollapsed && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mb-1 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => setSidebarCollapsed(false)}
-                  aria-label="Show lesson sidebar"
-                >
-                  <PanelLeft className="h-4 w-4" />
-                  Show Lessons
-                </Button>
-              )}
-            </div>
-
-            {/* Lesson content tab */}
-            <TabsContent value="lesson" className="flex-1 overflow-y-auto mt-0">
-              {lessonContent}
-            </TabsContent>
-
-            {/* Code challenge tab — full height editor, no padding for max space */}
-            <TabsContent value="challenge" className="flex-1 overflow-hidden mt-0">
-              <ErrorBoundary>
-                <CodeChallenge challenge={lesson.challenge} />
-              </ErrorBoundary>
-            </TabsContent>
-          </Tabs>
+        <div className="flex-1 min-w-0 overflow-hidden">
+          {tabContent}
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 min-w-0 overflow-y-auto">
           {lessonContent}
         </div>
       )}

@@ -47,7 +47,7 @@ export function LevelUpModal({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="overflow-hidden border-primary/30 bg-gradient-to-br from-primary/10 via-background to-secondary/10 sm:max-w-md" closeLabel={tc("close")}>
+      <DialogContent className="overflow-hidden border-primary/30 bg-card dark:bg-[#101018] sm:max-w-md" closeLabel={tc("close")}>
         <DialogHeader className="items-center text-center">
           <div className="level-up-sparkles mb-4 flex justify-center gap-2">
             <Sparkles className="h-6 w-6 animate-pulse text-yellow-400" aria-hidden="true" />

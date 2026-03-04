@@ -4,416 +4,564 @@ import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import {
-  GraduationCap,
-  Zap,
-  Trophy,
-  Shield,
-  BookOpen,
-  UserPlus,
-  Award,
-  ArrowRight,
-  Sparkles,
-  CheckCircle,
-  Layers,
-  ImageIcon,
-  Cpu,
-  Quote,
-  Star,
-  Flame,
+  GraduationCap, Zap, Trophy, Shield, BookOpen, UserPlus, Award,
+  ArrowRight, CheckCircle, Layers, ImageIcon, Cpu, Flame, Activity,
 } from "lucide-react";
 import { StartLearningButton } from "@/components/landing/StartLearningButton";
 import type { SanityCourse } from "@/lib/sanity/queries";
 import { CourseCard, CourseCardData } from "@/components/courses/CourseCard";
 import { motion, Variants } from "framer-motion";
-import { SpotlightCard } from "@/components/shared/SpotlightCard";
+import { useState } from "react";
 
-const container: Variants = {
+const fadeUp: Variants = {
+  hidden: { opacity: 0, y: 24 },
+  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 220, damping: 26 } },
+};
+
+const stagger: Variants = {
   hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1
-    }
-  }
+  show: { opacity: 1, transition: { staggerChildren: 0.07 } },
 };
 
-const item: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
-};
+const TICKER_ITEMS = [
+  { wallet: "7fXk...9mRq", action: "completed", lesson: "PDAs & CPIs", xp: "+150 XP" },
+  { wallet: "B3nN...4pLw", action: "earned credential", lesson: "Solana Fundamentals", xp: "NFT Minted" },
+  { wallet: "Qr2T...8sVx", action: "completed", lesson: "Account Model", xp: "+75 XP" },
+  { wallet: "mK9J...3zPq", action: "enrolled in", lesson: "Anchor Framework", xp: "+10 XP" },
+  { wallet: "5wLc...7nBr", action: "completed", lesson: "Token-2022", xp: "+100 XP" },
+  { wallet: "xHd8...2kFm", action: "completed", lesson: "DeFi Basics", xp: "+125 XP" },
+  { wallet: "Pn6Y...1vQs", action: "earned credential", lesson: "DeFi Developer", xp: "NFT Minted" },
+  { wallet: "9cRj...5tWe", action: "completed", lesson: "Hello World Program", xp: "+125 XP" },
+];
 
 export function LandingContent({ featuredCourses }: { featuredCourses: SanityCourse[] }) {
   const t = useTranslations("landing");
   const tPaths = useTranslations("learningPaths");
+  // Stable count — avoids hydration mismatch
+  const [liveCount] = useState(27);
 
   return (
-    <div className="flex flex-col">
-      {/* Hero — Asymmetric Layout */}
-      <section className="relative overflow-hidden py-20 sm:py-28 lg:py-32">
-        {/* Clean gradient background — single soft glow from top */}
-        <div className="absolute inset-0 bg-mesh opacity-60" />
-        <div className="absolute inset-0 bg-grid opacity-40" />
+    <div className="flex flex-col bg-background">
 
-        {/* Single ambient orb — top center */}
-        <div className="pointer-events-none absolute left-1/2 -top-40 h-[600px] w-[800px] -translate-x-1/2 rounded-full bg-primary/10 blur-[140px]" />
+      {/* ═══════════════════════════════════════
+          HERO
+      ═══════════════════════════════════════ */}
+      <section className="relative min-h-[88vh] flex flex-col justify-center overflow-hidden border-b border-white/5">
+        {/* Grid background */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: "linear-gradient(rgba(20,241,149,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(20,241,149,0.025) 1px, transparent 1px)",
+            backgroundSize: "64px 64px",
+          }}
+        />
+        {/* Ambient glows */}
+        <div className="absolute -top-48 -right-24 w-[700px] h-[700px] rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, rgba(153,69,255,0.06) 0%, transparent 70%)" }} />
+        <div className="absolute bottom-0 -left-48 w-[600px] h-[600px] rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, rgba(20,241,149,0.04) 0%, transparent 70%)" }} />
 
-        <div className="relative mx-auto max-w-7xl px-4">
-          <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-            {/* Left — Text Content */}
+        <div className="relative mx-auto w-full max-w-7xl px-4 sm:px-6 pt-16 pb-12">
+          <div className="grid items-center gap-8 lg:grid-cols-[1fr_460px]">
+
+            {/* ── Left: Typography block ── */}
             <motion.div
-              className="space-y-8 text-center lg:text-left"
-              variants={container}
+              variants={stagger}
               initial="hidden"
               animate="show"
+              className="space-y-7"
             >
-              {/* Solana badge */}
-              <motion.div variants={item} className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary backdrop-blur-sm">
-                <Sparkles className="h-4 w-4" aria-hidden="true" />
-                {t("hero.badge")}
+              {/* Live badge */}
+              <motion.div variants={fadeUp} className="inline-flex items-center gap-2" style={{ fontFamily: "var(--font-mono)" }}>
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" style={{ background: "#14F195" }} />
+                  <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: "#14F195" }} />
+                </span>
+                <span className="text-xs uppercase tracking-widest" style={{ color: "#14F195" }}>
+                  LIVE · {liveCount} on devnet
+                </span>
               </motion.div>
 
-              <motion.h1 variants={item} className="text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-6xl !leading-[1.1]">
-                <span className="gradient-text">{t("hero.title")}</span>
-              </motion.h1>
+              {/* Giant stacked heading */}
+              <div>
+                <motion.h1
+                  variants={stagger}
+                  initial="hidden"
+                  animate="show"
+                  className="uppercase leading-[0.92] tracking-[-0.02em]"
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "clamp(3rem, 6.5vw, 5.8rem)",
+                    fontWeight: 900,
+                  }}
+                >
+                  <motion.span variants={fadeUp} className="block text-foreground">LEARN</motion.span>
+                  <motion.span variants={fadeUp} className="block" style={{ color: "#14F195" }}>SOLANA</motion.span>
+                  <motion.span variants={fadeUp} className="block text-foreground">EARN</motion.span>
+                  <motion.span variants={fadeUp} className="block text-foreground/62">ON-CHAIN.</motion.span>
+                </motion.h1>
+              </div>
 
-              <motion.p variants={item} className="max-w-lg text-lg text-muted-foreground sm:text-xl lg:mx-0 mx-auto">
+              <motion.p variants={fadeUp} className="max-w-sm text-sm leading-relaxed text-foreground/62" style={{ fontFamily: "var(--font-mono)" }}>
                 {t("hero.subtitle")}
               </motion.p>
 
-              <motion.div variants={item} className="flex flex-col items-center gap-4 sm:flex-row lg:justify-start justify-center">
+              <motion.div variants={fadeUp} className="flex flex-wrap items-center gap-3">
                 <StartLearningButton />
                 <Link href="/courses">
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="lg"
-                    className="gap-2 border-white/20 text-white hover:bg-white/10 hover:text-white backdrop-blur-sm transition-all"
+                    className="gap-2 border rounded-none text-sm text-foreground/70"
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      borderColor: "hsl(var(--border))",
+                    }}
                   >
                     {t("cta.button")}
-                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                    <ArrowRight className="h-3.5 w-3.5" />
                   </Button>
                 </Link>
               </motion.div>
 
-              {/* Social proof */}
-              <motion.div variants={item} className="flex items-center gap-3 lg:justify-start justify-center">
-                <div className="flex -space-x-2">
-                  {["🟢", "🔵", "🟣", "🟠", "🔴"].map((emoji, i) => (
-                    <div key={i} className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-muted text-xs">
-                      {emoji}
-                    </div>
-                  ))}
-                </div>
-                <span className="text-sm text-muted-foreground">
-                  Join <span className="font-semibold text-foreground">500+</span> Solana developers
-                </span>
+              {/* Inline stats */}
+              <motion.div variants={fadeUp} className="flex items-stretch gap-0 border border-white/8 rounded-none w-fit">
+                {[
+                  { value: t("stats.coursesValue"), label: t("stats.courses") },
+                  { value: t("stats.lessonsValue"), label: t("stats.lessons") },
+                  { value: t("stats.challengesValue"), label: t("stats.challenges") },
+                  { value: t("stats.languagesValue"), label: t("stats.languages") },
+                ].map(({ value, label }, i) => (
+                  <div
+                    key={label}
+                    className="flex flex-col items-center justify-center px-5 py-3 text-center"
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      borderLeft: i > 0 ? "1px solid hsl(var(--border))" : "none",
+                    }}
+                  >
+                    <span className="text-lg font-bold tabular-nums text-foreground">{value}</span>
+                    <span className="text-[9px] uppercase tracking-widest mt-0.5 text-foreground/55">{label}</span>
+                  </div>
+                ))}
               </motion.div>
             </motion.div>
 
-            {/* Right — Product Mockup */}
+            {/* ── Right: Terminal panel ── */}
             <motion.div
-              initial={{ opacity: 0, x: 40, rotate: 2 }}
-              animate={{ opacity: 1, x: 0, rotate: 0 }}
-              transition={{ duration: 0.8, delay: 0.3, type: "spring" }}
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.25, type: "spring" }}
               className="hidden lg:block"
             >
-              <div className="relative rounded-2xl border border-white/10 bg-card/80 p-4 backdrop-blur-xl shadow-2xl shadow-black/40">
-                {/* Fake browser chrome */}
-                <div className="mb-3 flex items-center gap-2">
-                  <div className="flex gap-1.5">
-                    <div className="h-3 w-3 rounded-full bg-red-500/60" />
-                    <div className="h-3 w-3 rounded-full bg-yellow-500/60" />
-                    <div className="h-3 w-3 rounded-full bg-green-500/60" />
+              <div
+                className="overflow-hidden shadow-2xl"
+                style={{
+                  background: "hsl(var(--card))",
+                  border: "1px solid hsl(var(--border))",
+                  boxShadow: "0 0 0 1px rgba(20,241,149,0.04), 0 32px 64px rgba(0,0,0,0.6)",
+                }}
+              >
+                {/* Title bar */}
+                <div
+                  className="flex items-center justify-between px-4 py-2.5"
+                  style={{ background: "hsl(var(--muted))", borderBottom: "1px solid hsl(var(--border) / 0.5)" }}
+                >
+                  <div className="flex gap-1.5 text-foreground/45">
+                    <div className="h-2.5 w-2.5 rounded-full" style={{ background: "#FF5F57" }} />
+                    <div className="h-2.5 w-2.5 rounded-full" style={{ background: "#FEBC2E" }} />
+                    <div className="h-2.5 w-2.5 rounded-full" style={{ background: "#28C840" }} />
                   </div>
-                  <div className="flex-1 rounded-md bg-muted/50 px-3 py-1 text-[10px] text-muted-foreground font-mono">
-                    academy.superteam.fun/courses
-                  </div>
-                </div>
-                {/* Simulated lesson interface */}
-                <div className="grid grid-cols-5 gap-3">
-                  {/* Sidebar simulation */}
-                  <div className="col-span-2 space-y-2 rounded-lg bg-muted/30 p-3">
-                    <div className="flex items-center gap-2 rounded-md bg-primary/10 px-2 py-1.5">
-                      <CheckCircle className="h-3 w-3 text-primary" />
-                      <span className="text-[10px] font-medium text-primary">Intro to PDAs</span>
-                    </div>
-                    <div className="flex items-center gap-2 px-2 py-1.5">
-                      <CheckCircle className="h-3 w-3 text-primary/50" />
-                      <span className="text-[10px] text-muted-foreground">Account Model</span>
-                    </div>
-                    <div className="flex items-center gap-2 px-2 py-1.5">
-                      <Cpu className="h-3 w-3 text-muted-foreground/50" />
-                      <span className="text-[10px] text-muted-foreground">Token-2022</span>
-                    </div>
-                  </div>
-                  {/* Code editor simulation */}
-                  <div className="col-span-3 space-y-2 rounded-lg bg-black/40 p-3 font-mono text-[9px] leading-relaxed">
-                    <div><span className="text-secondary">use</span> <span className="text-primary">anchor_lang</span>::prelude::*;</div>
-                    <div className="mt-1"><span className="text-secondary">#[program]</span></div>
-                    <div><span className="text-secondary">pub mod</span> <span className="text-primary">academy</span> {"{"}</div>
-                    <div className="pl-3"><span className="text-secondary">pub fn</span> <span className="text-accent">enroll</span>(ctx) {"{"}</div>
-                    <div className="pl-6 text-muted-foreground">// Your code here</div>
-                    <div className="pl-3">{"}"}</div>
-                    <div>{"}"}</div>
-                  </div>
-                </div>
-                {/* XP indicator */}
-                <div className="mt-3 flex items-center justify-between rounded-lg bg-accent/5 border border-accent/20 px-3 py-2">
-                  <span className="text-[10px] font-semibold text-accent flex items-center gap-1">
-                    <Zap className="h-3 w-3" /> +50 XP earned
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px" }}>
+                    academy.superteam.fun — lesson.rs
                   </span>
-                  <span className="text-[10px] text-primary font-medium">✓ Tests Passed</span>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px", color: "#14F195", opacity: 0.5 }}>
+                    ● devnet
+                  </span>
+                </div>
+
+                {/* Editor body */}
+                <div className="flex">
+                  {/* Sidebar */}
+                  <div
+                    className="w-40 shrink-0 p-3 space-y-0.5 text-foreground/45"
+                    style={{ borderRight: "1px solid hsl(var(--border) / 0.5)" }}
+                  >
+                    <p style={{ fontFamily: "var(--font-mono)", fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px" }}>Module 1</p>
+                    {[
+                      { name: "Intro to PDAs", done: true, active: false },
+                      { name: "Account Model", done: true, active: false },
+                      { name: "Token-2022", done: false, active: true },
+                    ].map(({ name, done, active }) => (
+                      <div
+                        key={name}
+                        className={`flex items-center gap-1.5 px-2 py-1.5 ${active ? "text-[#14F195]" : done ? "text-foreground/62" : "text-foreground/55"}`}
+                        style={{
+                          fontFamily: "var(--font-mono)",
+                          fontSize: "9px",
+                          background: active ? "rgba(20,241,149,0.08)" : "transparent",
+                        }}
+                      >
+                        {done ? (
+                          <CheckCircle style={{ width: "10px", height: "10px", flexShrink: 0 }} />
+                        ) : (
+                          <div className="text-foreground/55" style={{ width: "10px", height: "10px", flexShrink: 0, borderRadius: "50%", border: "1px solid currentColor" }} />
+                        )}
+                        {name}
+                      </div>
+                    ))}
+                    <p style={{ fontFamily: "var(--font-mono)", fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.1em", marginTop: "12px", marginBottom: "8px" }}>Module 2</p>
+                    {["Anchor Setup", "Your Program", "PDAs & CPIs"].map(name => (
+                      <div
+                        key={name}
+                        className="flex items-center gap-1.5 px-2 py-1.5 text-foreground/55"
+                        style={{ fontFamily: "var(--font-mono)", fontSize: "9px" }}
+                      >
+                        <div style={{ width: "10px", height: "10px", flexShrink: 0, borderRadius: "50%", border: "1px solid hsl(var(--border))" }} />
+                        {name}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Code pane */}
+                  <div className="flex-1 p-4" style={{ background: "hsl(var(--card))" }}>
+                    <div style={{ fontFamily: "var(--font-mono)", fontSize: "11px", lineHeight: "1.7" }}>
+                      {[
+                        { ln: "1", parts: [{ t: "use", c: "#7ECA9C" }, { t: " anchor_lang", c: "#14F195" }, { t: "::prelude::*;", c: "rgba(237,233,225,0.62)" }] },
+                        { ln: "2", parts: [{ t: " ", c: "" }] },
+                        { ln: "3", parts: [{ t: "#[program]", c: "#C792EA" }] },
+                        { ln: "4", parts: [{ t: "pub mod", c: "#7ECA9C" }, { t: " academy", c: "#82AAFF" }, { t: " {", c: "rgba(237,233,225,0.7)" }] },
+                        { ln: "5", parts: [{ t: "  pub fn", c: "#7ECA9C" }, { t: " enroll", c: "#FFB800" }, { t: "(ctx) {", c: "rgba(237,233,225,0.7)" }] },
+                        { ln: "6", parts: [{ t: "    // ✏️  Your code here", c: "rgba(237,233,225,0.45)" }] },
+                        { ln: "7", parts: [{ t: "  }", c: "rgba(237,233,225,0.7)" }] },
+                        { ln: "8", parts: [{ t: "}", c: "rgba(237,233,225,0.7)" }] },
+                      ].map(({ ln, parts }) => (
+                        <div key={ln} className="flex items-center gap-4 text-foreground/55">
+                          <span style={{ width: "16px", textAlign: "right", userSelect: "none", flexShrink: 0 }}>{ln}</span>
+                          <span>
+                            {parts.map((p, i) => (
+                              <span key={i} style={{ color: p.c }}>{p.t}</span>
+                            ))}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status bar */}
+                <div
+                  className="flex items-center justify-between px-4 py-2"
+                  style={{ background: "hsl(var(--muted))", borderTop: "1px solid hsl(var(--border) / 0.5)" }}
+                >
+                  <div className="flex items-center gap-1.5 text-foreground/45" style={{ fontFamily: "var(--font-mono)", fontSize: "9px" }}>
+                    <Zap style={{ width: "10px", height: "10px", color: "#FFB800" }} />
+                    <span style={{ color: "#FFB800", fontWeight: "bold" }}>+150 XP</span>
+                    <span>on completion</span>
+                  </div>
+                  <div className="flex items-center gap-1.5" style={{ fontFamily: "var(--font-mono)", fontSize: "9px", color: "#14F195" }}>
+                    <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: "#14F195" }} />
+                    tests ready
+                  </div>
                 </div>
               </div>
             </motion.div>
+
           </div>
         </div>
       </section>
 
-      {/* Stats — Bento Grid */}
-      <section className="border-y border-border/40 py-12">
-        <div className="mx-auto max-w-7xl px-4">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            {(
-              [
-                { valueKey: "coursesValue" as const, labelKey: "courses" as const, icon: BookOpen, featured: true },
-                { valueKey: "lessonsValue" as const, labelKey: "lessons" as const, icon: Layers, featured: false },
-                { valueKey: "challengesValue" as const, labelKey: "challenges" as const, icon: Cpu, featured: false },
-                { valueKey: "languagesValue" as const, labelKey: "languages" as const, icon: GraduationCap, featured: false },
-              ]
-            ).map(({ valueKey, labelKey, icon: StatIcon, featured }, idx) => (
-              <motion.div
-                key={labelKey}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: idx * 0.1 }}
-                className={`flex flex-col items-center justify-center rounded-xl p-6 text-center border transition-colors ${featured
-                  ? "border-primary/30 bg-primary/5 col-span-2 sm:col-span-1 sm:row-span-1"
-                  : "border-white/5 bg-card/50"
-                  } hover:border-primary/30`}
-              >
-                <StatIcon className={`mb-3 h-5 w-5 ${featured ? "text-primary" : "text-muted-foreground"}`} aria-hidden="true" />
-                <span className={`text-3xl font-bold sm:text-4xl ${featured ? "gradient-text" : "text-foreground"}`}>
-                  {t(`stats.${valueKey}`)}
-                </span>
-                <span className="mt-1 text-sm font-medium text-muted-foreground">
-                  {t(`stats.${labelKey}`)}
-                </span>
-              </motion.div>
-            ))}
+      {/* ═══════════════════════════════════════
+          LIVE ACTIVITY TICKER
+      ═══════════════════════════════════════ */}
+      <div className="border-b border-border/20 overflow-hidden bg-background">
+        <div className="flex items-stretch">
+          {/* Label */}
+          <div
+            className="shrink-0 flex items-center gap-2 px-4 py-2.5 z-10"
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "10px",
+              borderRight: "1px solid hsl(var(--border))",
+              background: "hsl(var(--background))",
+            }}
+          >
+            <Activity style={{ width: "11px", height: "11px", color: "#14F195" }} />
+            <span style={{ color: "#14F195", textTransform: "uppercase", letterSpacing: "0.12em" }}>Live</span>
+          </div>
+
+          {/* Scrolling ticker */}
+          <div className="overflow-hidden relative flex-1">
+            <div className="flex" style={{ animation: "ticker-scroll 40s linear infinite", width: "max-content" }}>
+              {[...TICKER_ITEMS, ...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-2.5 px-6 py-2.5 shrink-0"
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "10px",
+                    borderRight: "1px solid hsl(var(--border) / 0.3)",
+                  }}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full shrink-0 text-foreground/62 text-foreground/45 text-foreground/80" style={{ background: "#14F195" }} />
+                  <span>{item.wallet}</span>
+                  <span>{item.action}</span>
+                  <span>{item.lesson}</span>
+                  <span style={{ color: item.xp.includes("NFT") ? "#9945FF" : "#FFB800", fontWeight: "600" }}>{item.xp}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* Features */}
-      <section className="py-24">
+      {/* ═══════════════════════════════════════
+          FEATURES
+      ═══════════════════════════════════════ */}
+      <section className="py-20 border-b border-white/5">
         <div className="mx-auto max-w-7xl px-4">
-          <div className="mb-16 text-center">
-            <h2 className="text-3xl font-bold sm:text-4xl">
+          <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }} className="mb-10">
+            <motion.p variants={fadeUp} className="text-xs uppercase tracking-widest mb-3" style={{ fontFamily: "var(--font-mono)", color: "#14F195" }}>
+              $ features --list
+            </motion.p>
+            <motion.h2 variants={fadeUp} className="text-3xl font-bold text-foreground sm:text-4xl">
               {t("features.title")}
-            </h2>
-          </div>
+            </motion.h2>
+          </motion.div>
+
           <motion.div
-            className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4"
-            variants={container}
+            variants={stagger}
             initial="hidden"
             whileInView="show"
-            viewport={{ once: true, margin: "-100px" }}
+            viewport={{ once: true, margin: "-60px" }}
+            className="grid sm:grid-cols-2 lg:grid-cols-4 overflow-hidden"
+            style={{ border: "1px solid hsl(var(--border) / 0.6)", gap: "1px", background: "hsl(var(--border) / 0.6)" }}
           >
             {[
-              { icon: Shield, key: "onChain" as const, gradient: "from-primary/20 to-primary/5", borderHover: "hover:border-primary/50", glowHover: "group-hover:shadow-[0_0_30px_rgba(20,241,149,0.15)]" },
-              { icon: Zap, key: "soulboundXP" as const, gradient: "from-accent/20 to-accent/5", borderHover: "hover:border-accent/50", glowHover: "group-hover:shadow-[0_0_30px_rgba(255,184,0,0.15)]" },
-              { icon: Trophy, key: "nftCredentials" as const, gradient: "from-secondary/20 to-secondary/5", borderHover: "hover:border-secondary/50", glowHover: "group-hover:shadow-[0_0_30px_rgba(153,69,255,0.15)]" },
-              { icon: GraduationCap, key: "openSource" as const, gradient: "from-primary/20 to-primary/5", borderHover: "hover:border-primary/50", glowHover: "group-hover:shadow-[0_0_30px_rgba(20,241,149,0.15)]" },
-            ].map(({ icon: Icon, key, gradient, borderHover, glowHover }, idx) => (
-              <motion.div variants={item} key={key} className="h-full">
-                <SpotlightCard
-                  className="h-full p-6 text-left group"
-                  variant={idx % 2 === 0 ? "primary" : "secondary"}
+              { icon: Shield, key: "onChain" as const, cmd: "on-chain-xp", accent: "#14F195" },
+              { icon: Zap, key: "soulboundXP" as const, cmd: "soulbound-tokens", accent: "#FFB800" },
+              { icon: Trophy, key: "nftCredentials" as const, cmd: "nft-credentials", accent: "#9945FF" },
+              { icon: GraduationCap, key: "openSource" as const, cmd: "open-source", accent: "#14F195" },
+            ].map(({ icon: Icon, key, cmd, accent }) => (
+              <motion.div
+                key={key}
+                variants={fadeUp}
+                className="group relative p-7 transition-colors cursor-default text-foreground/55"
+                style={{ background: "hsl(var(--card))" }}
+                onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = "hsl(var(--muted))"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = "hsl(var(--card))"; }}
+              >
+                <p style={{ fontFamily: "var(--font-mono)", fontSize: "9px", marginBottom: "20px" }}>
+                  $ feature.{cmd}
+                </p>
+                <div
+                  className="mb-4 inline-flex h-9 w-9 items-center justify-center"
+                  style={{
+                    border: `1px solid ${accent}28`,
+                    background: `${accent}0A`,
+                    color: accent,
+                  }}
                 >
-                  <div className={`mb-4 inline-flex rounded-lg bg-gradient-to-br ${gradient} p-3 ring-1 ring-white/10 group-hover:ring-white/20 transition-all`}>
-                    <Icon className="h-6 w-6 text-foreground group-hover:text-white transition-colors" aria-hidden="true" />
-                  </div>
-                  <h3 className="mb-2 text-lg font-bold tracking-tight-premium group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-white/70 transition-all">
-                    {t(`features.${key}.title`)}
-                  </h3>
-                  <p className="text-sm leading-relaxed text-muted-foreground group-hover:text-muted-foreground/90">
-                    {t(`features.${key}.description`)}
-                  </p>
-                </SpotlightCard>
+                  <Icon style={{ width: "16px", height: "16px" }} />
+                </div>
+                <h3 className="mb-2 text-sm font-bold text-foreground" style={{ fontFamily: "var(--font-mono)" }}>
+                  {t(`features.${key}.title`)}
+                </h3>
+                <p className="text-xs leading-relaxed text-foreground/62">
+                  {t(`features.${key}.description`)}
+                </p>
+                {/* Accent line on hover */}
+                <div
+                  className="absolute bottom-0 left-0 h-[2px] transition-all duration-500"
+                  style={{ background: accent, width: "0%" }}
+                  ref={el => {
+                    if (!el) return;
+                    const parent = el.parentElement!;
+                    parent.addEventListener("mouseenter", () => { el.style.width = "100%"; });
+                    parent.addEventListener("mouseleave", () => { el.style.width = "0%"; });
+                  }}
+                />
               </motion.div>
             ))}
           </motion.div>
         </div>
       </section>
 
-      {/* How it Works */}
-      <section className="border-t border-border/40 bg-muted/30 py-24 relative overflow-hidden">
-        {/* subtle grid background */}
-        <div className="absolute inset-0 bg-grid opacity-30 pointer-events-none" />
-
-        <div className="relative mx-auto max-w-7xl px-4">
-          <div className="mb-16 text-center">
-            <h2 className="text-3xl font-bold sm:text-4xl">
+      {/* ═══════════════════════════════════════
+          HOW IT WORKS
+      ═══════════════════════════════════════ */}
+      <section className="py-20 border-b border-white/5" style={{ background: "hsl(var(--card))" }}>
+        <div className="mx-auto max-w-7xl px-4">
+          <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true }} className="mb-10">
+            <motion.p variants={fadeUp} className="text-xs uppercase tracking-widest mb-3" style={{ fontFamily: "var(--font-mono)", color: "#14F195" }}>
+              $ how-it-works
+            </motion.p>
+            <motion.h2 variants={fadeUp} className="text-3xl font-bold text-foreground sm:text-4xl">
               {t("howItWorks.title")}
-            </h2>
-          </div>
-          <div className="relative grid gap-10 sm:grid-cols-2 lg:grid-cols-4 pt-4">
-            {/* Connecting line (desktop only) */}
-            <div className="absolute left-0 right-0 top-[40%] -translate-y-1/2 hidden h-0.5 bg-gradient-to-r from-transparent via-primary/20 to-transparent lg:block" />
+            </motion.h2>
+          </motion.div>
 
-            {(
-              [
-                { step: "step1" as const, icon: UserPlus, reward: "+ 10 XP" },
-                { step: "step2" as const, icon: BookOpen, reward: "Unlock Paths" },
-                { step: "step3" as const, icon: CheckCircle, reward: "+ 500 XP" },
-                { step: "step4" as const, icon: Award, reward: "NFT Mint" },
-              ] as const
-            ).map(({ step, icon: StepIcon, reward }, idx) => (
-              <div key={step} className="relative text-center group h-full">
-                <SpotlightCard variant={idx % 2 === 0 ? "primary" : "accent"} className="p-8 h-full flex flex-col items-center justify-center relative z-10 bg-card/80 backdrop-blur-md overflow-visible mt-2">
-                  <div className="absolute -top-4 -right-4 rounded-full bg-secondary/10 border border-secondary/30 px-4 py-1.5 text-xs font-bold text-secondary shadow-[0_0_15px_rgba(20,241,149,0.2)] rotate-12 group-hover:rotate-0 transition-all duration-300">
-                    <span className="flex items-center gap-1.5">
-                      <Zap className="h-3 w-3" />
-                      {reward}
-                    </span>
+          <div className="relative grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {/* Connector */}
+            <div className="absolute left-0 right-0 top-[4.5rem] hidden h-px lg:block" style={{ background: "linear-gradient(90deg, transparent, rgba(20,241,149,0.12) 20%, rgba(20,241,149,0.12) 80%, transparent)" }} />
+
+            {([
+              { step: "step1" as const, icon: UserPlus, reward: "+10 XP", num: "01" },
+              { step: "step2" as const, icon: BookOpen, reward: "Unlock Paths", num: "02" },
+              { step: "step3" as const, icon: CheckCircle, reward: "+500 XP", num: "03" },
+              { step: "step4" as const, icon: Award, reward: "NFT Mint", num: "04" },
+            ] as const).map(({ step, icon: StepIcon, reward, num }, idx) => (
+              <motion.div
+                key={step}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: idx * 0.08 }}
+                className="group relative p-6 text-foreground/45"
+                style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border) / 0.6)" }}
+              >
+                <div
+                  className="absolute -top-3 left-4 px-2"
+                  style={{ fontFamily: "var(--font-mono)", fontSize: "9px", background: "hsl(var(--card))" }}
+                >
+                  {num}
+                </div>
+                <div className="mt-2 mb-4 flex items-center gap-2.5">
+                  <div
+                    className="flex h-9 w-9 items-center justify-center"
+                    style={{ border: "1px solid rgba(20,241,149,0.18)", background: "rgba(20,241,149,0.06)", color: "#14F195" }}
+                  >
+                    <StepIcon style={{ width: "16px", height: "16px" }} />
                   </div>
-
-                  <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/90 to-primary/60 text-primary-foreground shadow-[0_0_20px_rgba(20,241,149,0.3)] group-hover:scale-110 group-hover:shadow-[0_0_30px_rgba(20,241,149,0.5)] transition-all duration-300 border border-white/10">
-                    <StepIcon className="h-9 w-9" aria-hidden="true" />
-                  </div>
-
-                  <div className="absolute -left-3 top-1/2 -translate-y-1/2 hidden lg:flex h-8 w-8 items-center justify-center rounded-full bg-secondary/20 border border-secondary/40 text-sm font-bold text-secondary shadow-lg z-20">
-                    {idx + 1}
-                  </div>
-
-                  {/* For mobile layout */}
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 flex lg:hidden h-8 w-8 items-center justify-center rounded-full bg-secondary/20 border border-secondary/40 text-sm font-bold text-secondary shadow-lg z-20">
-                    {idx + 1}
-                  </div>
-
-                  <h3 className="mb-3 text-xl font-semibold tracking-tight-premium group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-primary transition-all">
-                    {t(`howItWorks.${step}.title`)}
-                  </h3>
-                  <p className="text-sm leading-relaxed text-muted-foreground group-hover:text-muted-foreground/90 transition-colors">
-                    {t(`howItWorks.${step}.description`)}
-                  </p>
-                </SpotlightCard>
-              </div>
+                  <span
+                    className="px-2 py-0.5 text-[9px] font-semibold"
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      border: "1px solid rgba(255,184,0,0.25)",
+                      background: "rgba(255,184,0,0.06)",
+                      color: "#FFB800",
+                    }}
+                  >
+                    {reward}
+                  </span>
+                </div>
+                <h3
+                  className="mb-2 text-sm font-bold text-foreground transition-colors group-hover:text-[#14F195]"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                >
+                  {t(`howItWorks.${step}.title`)}
+                </h3>
+                <p className="text-xs leading-relaxed text-foreground/62">
+                  {t(`howItWorks.${step}.description`)}
+                </p>
+              </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Learning Paths */}
-      <section className="py-24 relative overflow-hidden">
-        <div className="absolute inset-0 bg-grid opacity-30 pointer-events-none" />
-        <div className="relative mx-auto max-w-7xl px-4">
-          <div className="mb-16 text-center">
-            <h2 className="text-3xl font-bold sm:text-4xl">
+      {/* ═══════════════════════════════════════
+          LEARNING PATHS
+      ═══════════════════════════════════════ */}
+      <section className="py-20 border-b border-white/5">
+        <div className="mx-auto max-w-7xl px-4">
+          <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true }} className="mb-10">
+            <motion.p variants={fadeUp} className="text-xs uppercase tracking-widest mb-3" style={{ fontFamily: "var(--font-mono)", color: "#14F195" }}>
+              $ learning-paths --all
+            </motion.p>
+            <motion.h2 variants={fadeUp} className="text-3xl font-bold text-foreground sm:text-4xl">
               {tPaths("title")}
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground">
+            </motion.h2>
+            <motion.p variants={fadeUp} className="mt-2 text-sm text-foreground/62">
               {tPaths("subtitle")}
-            </p>
-          </div>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {(
-              [
-                {
-                  key: "solanaFundamentals" as const,
-                  icon: Layers,
-                  gradient: "from-primary/10 to-primary/5",
-                  track: "solana-fundamentals",
-                  comingSoon: false,
-                  reward: "+1000 XP & Builder Badge"
-                },
-                {
-                  key: "defiDevelopment" as const,
-                  icon: Zap,
-                  gradient: "from-secondary/10 to-secondary/5",
-                  track: "defi-development",
-                  comingSoon: true,
-                  reward: "+2500 XP & DeFi Master Badge"
-                },
-                {
-                  key: "nftGaming" as const,
-                  icon: ImageIcon,
-                  gradient: "from-accent/10 to-accent/5",
-                  track: "nft-gaming",
-                  comingSoon: true,
-                  reward: "+2000 XP & Creator Badge"
-                },
-                {
-                  key: "advancedProtocol" as const,
-                  icon: Cpu,
-                  gradient: "from-primary/10 to-secondary/5",
-                  track: "advanced-protocol",
-                  comingSoon: true,
-                  reward: "+5000 XP & Core Contributor"
-                },
-              ] as const
-            ).map(({ key, icon: PathIcon, gradient, track, comingSoon, reward }, idx) => (
-              <Link key={key} href={comingSoon ? "#" : `/courses?track=${track}`}>
-                <SpotlightCard className={`group flex h-full flex-col p-6 transition-all border border-white/10 hover:border-primary/50 block shadow-xl ${comingSoon ? "bg-card/40 opacity-90" : "bg-card/80 opacity-100 ring-1 ring-primary/30"}`} variant={idx % 2 !== 0 ? "secondary" : "primary"}>
-                  <div className="flex items-start justify-between mb-4">
-                    <div className={`inline-flex rounded-lg bg-gradient-to-br ${gradient} p-3 ring-1 ring-white/10 group-hover:ring-white/30 transition-all`}>
-                      <PathIcon className="h-6 w-6 text-primary group-hover:text-white transition-colors" aria-hidden="true" />
+            </motion.p>
+          </motion.div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {([
+              { key: "solanaFundamentals" as const, icon: Layers, track: "solana-fundamentals", comingSoon: false, xp: "1,000", badge: "Builder", accent: "#14F195" },
+              { key: "defiDevelopment" as const, icon: Zap, track: "defi-development", comingSoon: true, xp: "2,500", badge: "DeFi Master", accent: "#FFB800" },
+              { key: "nftGaming" as const, icon: ImageIcon, track: "nft-gaming", comingSoon: true, xp: "2,000", badge: "Creator", accent: "#9945FF" },
+              { key: "advancedProtocol" as const, icon: Cpu, track: "advanced-protocol", comingSoon: true, xp: "5,000", badge: "Core Dev", accent: "#00D4FF" },
+            ] as const).map(({ key, icon: PathIcon, track, comingSoon, xp, badge, accent }, idx) => (
+              <motion.div
+                key={key}
+                initial={{ opacity: 0, y: 14 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: idx * 0.08 }}
+              >
+                <Link href={comingSoon ? "#" : `/courses?track=${track}`}>
+                  <div
+                    className="group h-full p-6 flex flex-col transition-all"
+                    style={{
+                      background: comingSoon ? "hsl(var(--background) / 0.5)" : "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      opacity: comingSoon ? 0.65 : 1,
+                    }}
+                    onMouseEnter={e => {
+                      if (!comingSoon) (e.currentTarget as HTMLDivElement).style.borderColor = `${accent}35`;
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLDivElement).style.borderColor = "hsl(var(--border))";
+                    }}
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div
+                        className="flex h-9 w-9 items-center justify-center"
+                        style={{ border: `1px solid ${accent}22`, background: `${accent}08`, color: accent }}
+                      >
+                        <PathIcon style={{ width: "16px", height: "16px" }} />
+                      </div>
+                      {!comingSoon ? (
+                        <div className="flex items-center gap-1 text-foreground/45" style={{ fontFamily: "var(--font-mono)", fontSize: "9px", color: "#14F195" }}>
+                          <Flame style={{ width: "10px", height: "10px" }} />
+                          LIVE
+                        </div>
+                      ) : (
+                        <span style={{ fontFamily: "var(--font-mono)", fontSize: "9px", border: "1px solid hsl(var(--border))", padding: "2px 8px" }}>
+                          {tPaths("comingSoon")}
+                        </span>
+                      )}
                     </div>
-                    {!comingSoon ? (
-                      <div className="flex items-center gap-1.5 rounded-full bg-primary/20 border border-primary/30 px-2 py-1 text-[10px] font-bold text-primary animate-pulse shadow-[0_0_10px_rgba(20,241,149,0.4)]">
-                        <Flame className="h-3 w-3" />
-                        HOT
+
+                    <h3 className="mb-1.5 text-sm font-bold text-foreground" style={{ fontFamily: "var(--font-mono)" }}>
+                      {tPaths(`paths.${key}.title`)}
+                    </h3>
+                    <p className="flex-1 text-xs leading-relaxed mb-4 text-foreground/62">
+                      {tPaths(`paths.${key}.description`)}
+                    </p>
+
+                    <div className="flex items-center justify-between pt-3 text-foreground/45" style={{ borderTop: "1px solid hsl(var(--border) / 0.5)" }}>
+                      <div>
+                        <div className="text-xs font-bold text-foreground/45" style={{ fontFamily: "var(--font-mono)", color: accent }}>{xp} XP</div>
+                        <div style={{ fontFamily: "var(--font-mono)", fontSize: "9px" }}>{badge} Badge</div>
                       </div>
-                    ) : (
-                      <div className="flex items-center gap-1 rounded-full bg-white/5 border border-white/10 px-2.5 py-1 text-[10px] font-bold text-muted-foreground whitespace-nowrap">
-                        {tPaths("comingSoon")}
-                      </div>
-                    )}
-                  </div>
-
-                  <h3 className="mb-2 text-lg font-bold tracking-tight-premium group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-primary transition-all">
-                    {tPaths(`paths.${key}.title`)}
-                  </h3>
-
-                  <div className="mb-4 inline-flex items-center gap-1.5 rounded-md bg-secondary/10 px-2 py-1 border border-secondary/20 w-fit">
-                    <Trophy className="h-3.5 w-3.5 text-secondary ml-1.5" aria-hidden="true" />
-                    <span className="text-[11px] font-semibold text-secondary-foreground pr-2 py-0.5">{reward}</span>
-                  </div>
-
-                  <p className="flex-1 text-sm leading-relaxed text-muted-foreground group-hover:text-muted-foreground/90 transition-colors">
-                    {tPaths(`paths.${key}.description`)}
-                  </p>
-
-                  <div className="mt-6 flex items-center justify-between border-t border-border/40 pt-4">
-                    <span className={`flex items-center gap-1.5 text-xs font-bold transition-all ${comingSoon ? "text-muted-foreground" : "text-primary group-hover:text-white"}`}>
-                      {comingSoon ? "Unlock soon" : tPaths("startPath")}
-                      <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                    </span>
-                    <div className="h-1.5 w-16 rounded-full bg-white/5 overflow-hidden">
-                      <div className="h-full bg-primary/40 w-0 group-hover:w-full transition-all duration-500 ease-out" />
+                      {!comingSoon && (
+                        <ArrowRight
+                          style={{ width: "14px", height: "14px", transition: "all 0.2s" }}
+                          className="group-hover:translate-x-1 group-hover:text-[#14F195] transition-all"
+                        />
+                      )}
                     </div>
                   </div>
-                </SpotlightCard>
-              </Link>
+                </Link>
+              </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Featured Courses — only shown when Sanity has published courses */}
+      {/* ═══════════════════════════════════════
+          FEATURED COURSES (conditional)
+      ═══════════════════════════════════════ */}
       {featuredCourses.length > 0 && (
-        <section className="py-24">
+        <section className="py-20 border-b border-white/5" style={{ background: "hsl(var(--card))" }}>
           <div className="mx-auto max-w-7xl px-4">
-            <div className="mb-16 text-center">
-              <h2 className="text-3xl font-bold sm:text-4xl">
-                {t("featuredCourses.title")}
-              </h2>
-              <p className="mt-4 text-lg text-muted-foreground">
-                {t("featuredCourses.subtitle")}
+            <div className="mb-10">
+              <p className="text-xs uppercase tracking-widest mb-3" style={{ fontFamily: "var(--font-mono)", color: "#14F195" }}>
+                $ courses --featured
               </p>
+              <h2 className="text-3xl font-bold text-foreground sm:text-4xl">{t("featuredCourses.title")}</h2>
             </div>
-
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {featuredCourses.map((course, idx) => {
                 const cardData: CourseCardData = {
@@ -427,21 +575,25 @@ export function LandingContent({ featuredCourses }: { featuredCourses: SanityCou
                   totalEnrollments: 0,
                   progress: null,
                   tags: course.tags ?? [],
-                  totalMinutes: course.lessons?.reduce(
-                    (sum, l) => sum + (l.estimatedMinutes ?? 0),
-                    0
-                  ) ?? 0,
+                  totalMinutes: course.lessons?.reduce((sum, l) => sum + (l.estimatedMinutes ?? 0), 0) ?? 0,
                   onChainCourseId: course.onChainCourseId,
                 };
                 return <CourseCard key={course._id} course={cardData} priority={idx === 0} index={idx} />;
               })}
             </div>
-
-            <div className="mt-10 text-center">
+            <div className="mt-8">
               <Link href="/courses">
-                <Button variant="outline" size="lg" className="gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-2 text-xs rounded-none text-foreground/62"
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    border: "1px solid hsl(var(--border))",
+                  }}
+                >
                   {t("featuredCourses.viewAll")}
-                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  <ArrowRight style={{ width: "12px", height: "12px" }} />
                 </Button>
               </Link>
             </div>
@@ -449,23 +601,31 @@ export function LandingContent({ featuredCourses }: { featuredCourses: SanityCou
         </section>
       )}
 
-      {/* Partner Logos */}
-      <section className="border-y border-border/50 py-12 bg-muted/30">
-        <div className="mx-auto max-w-6xl px-4 text-center">
-          <p className="text-sm font-medium text-muted-foreground mb-8 uppercase tracking-wider">
+      {/* ═══════════════════════════════════════
+          PARTNERS
+      ═══════════════════════════════════════ */}
+      <section className="border-b border-white/5 py-10">
+        <div className="mx-auto max-w-7xl px-4">
+          <p className="mb-6 text-center text-foreground/55" style={{ fontFamily: "var(--font-mono)", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.12em" }}>
             {t("partners.title")}
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-6 md:gap-10">
+          <div className="flex flex-wrap items-center justify-center gap-3">
             {[
-              { name: "Solana", color: "from-primary/20 to-secondary/10", text: "text-primary" },
-              { name: "Metaplex", color: "from-primary/15 to-primary/5", text: "text-primary" },
-              { name: "Helius", color: "from-orange-500/15 to-orange-500/5", text: "text-orange-500" },
-              { name: "Superteam", color: "from-secondary/20 to-secondary/5", text: "text-secondary-foreground" },
-              { name: "Anchor", color: "from-blue-500/15 to-blue-500/5", text: "text-blue-500" },
-            ].map(({ name, color, text }) => (
+              { name: "Solana", accent: "#14F195" },
+              { name: "Metaplex", accent: "#14F195" },
+              { name: "Helius", accent: "#F97316" },
+              { name: "Superteam", accent: "#9945FF" },
+              { name: "Anchor", accent: "#3B82F6" },
+            ].map(({ name, accent }) => (
               <div
                 key={name}
-                className={`rounded-xl bg-gradient-to-br ${color} border border-border/40 px-5 py-2.5 font-semibold text-sm ${text} tracking-wide`}
+                className="px-5 py-2 cursor-default transition-colors text-foreground/62 hover:text-foreground/75 bg-card border border-border/60"
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "11px",
+                  borderLeftColor: accent,
+                  borderLeftWidth: "2px",
+                }}
               >
                 {name}
               </div>
@@ -474,88 +634,43 @@ export function LandingContent({ featuredCourses }: { featuredCourses: SanityCou
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="py-20">
-        <div className="mx-auto max-w-6xl px-4">
-          <h2 className="text-3xl font-bold text-center mb-4">{t("testimonials.title")}</h2>
-          <p className="text-muted-foreground text-center mb-12 max-w-xl mx-auto">
-            {t("testimonials.subtitle")}
-          </p>
-          <div className="grid gap-6 md:grid-cols-3">
-            {(
-              [
-                { idx: 0 as const, initials: "AR" },
-                { idx: 1 as const, initials: "SC" },
-                { idx: 2 as const, initials: "MJ" },
-              ] as const
-            ).map(({ idx, initials }) => (
-              <div
-                key={idx}
-                className="relative flex flex-col gap-4 rounded-xl border border-border/50 border-l-2 border-l-primary/20 bg-card p-6 card-hover"
-              >
-                {/* Prominent quote icon */}
-                <Quote
-                  className="-rotate-6 text-primary/20"
-                  style={{ width: 32, height: 32 }}
-                  aria-hidden="true"
-                />
-                {/* Star rating */}
-                <div className="flex items-center gap-0.5">
-                  {[0, 1, 2, 3, 4].map((s) => (
-                    <Star
-                      key={s}
-                      className="h-3.5 w-3.5 text-yellow-400 fill-yellow-400"
-                      aria-hidden="true"
-                    />
-                  ))}
-                </div>
-                <p className="flex-1 text-sm leading-relaxed text-muted-foreground">
-                  {t(`testimonials.items.${idx}.text`)}
-                </p>
-                <div className="flex items-center gap-3 pt-2 border-t border-border/40">
-                  {/* Avatar with gradient ring */}
-                  <div className="ring-2 ring-primary/30 ring-offset-2 ring-offset-card rounded-full shrink-0">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/70 text-xs font-bold text-primary-foreground">
-                      {initials}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold leading-tight">
-                      {t(`testimonials.items.${idx}.name`)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {t(`testimonials.items.${idx}.role`)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="relative overflow-hidden py-24">
-        <div className="animate-gradient absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-secondary/10" />
-        <div className="pointer-events-none absolute -left-48 top-0 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
-        <div className="pointer-events-none absolute -right-48 bottom-0 h-96 w-96 rounded-full bg-secondary/5 blur-3xl" />
-
-        <div className="relative mx-auto max-w-3xl px-4 text-center">
-          <h2 className="mb-4 text-3xl font-bold sm:text-4xl">{t("cta.title")}</h2>
-          <p className="mb-10 text-lg text-muted-foreground">
-            {t("cta.subtitle")}
-          </p>
-          <Link href="/courses">
-            <Button
-              size="lg"
-              className="glow-primary-pulse gap-2 px-8 text-base font-semibold"
+      {/* ═══════════════════════════════════════
+          FINAL CTA
+      ═══════════════════════════════════════ */}
+      <section className="py-28">
+        <div className="mx-auto max-w-4xl px-4 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="space-y-6"
+          >
+            <p className="text-xs uppercase tracking-widest" style={{ fontFamily: "var(--font-mono)", color: "#14F195" }}>
+              $ ready
+            </p>
+            <h2
+              className="uppercase leading-[0.9]"
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: "clamp(2.2rem, 5vw, 4.5rem)",
+                fontWeight: 900,
+                color: "white",
+              }}
             >
-              <GraduationCap className="h-5 w-5" aria-hidden="true" />
-              {t("cta.button")}
-            </Button>
-          </Link>
+              START BUILDING<br className="text-foreground/62" />
+              <span style={{ color: "#14F195" }}>ON SOLANA</span><br />
+              <span>TODAY.</span>
+            </h2>
+            <p className="text-sm mx-auto max-w-xs text-foreground/62">
+              Join 500+ developers. Free to start. Real on-chain credentials.
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <StartLearningButton />
+            </div>
+          </motion.div>
         </div>
       </section>
+
     </div>
   );
 }

@@ -8,6 +8,7 @@ declare module "next-auth" {
   interface Session {
     user: {
       walletAddress?: string;
+      linkedWallet?: string;
     } & import("next-auth").DefaultSession["user"];
   }
 }

@@ -66,14 +66,14 @@ export default async function CoursesPage({ params, searchParams }: Props) {
   return (
     <div className="mx-auto max-w-7xl px-4 py-12">
       {/* ── Hero header ── */}
-      <div className="relative mb-12 overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-br from-primary/5 via-background to-accent/5 px-8 py-12">
+      <div className="courses-hero relative mb-8 sm:mb-12 overflow-hidden rounded-2xl border border-border dark:border-border/50 bg-gradient-to-br from-[hsl(160_80%_32%/0.10)] via-card to-[hsl(262_83%_58%/0.08)] dark:from-primary/5 dark:via-background dark:to-accent/5 px-4 py-8 sm:px-8 sm:py-12 shadow-sm dark:shadow-none">
         {/* Dot grid overlay */}
-        <div className="courses-dot-grid pointer-events-none absolute inset-0 opacity-60" />
+        <div className="courses-dot-grid pointer-events-none absolute inset-0 opacity-80 dark:opacity-60" />
 
         {/* Decorative blockchain-node SVG */}
         <svg
           aria-hidden="true"
-          className="pointer-events-none absolute right-6 top-1/2 -translate-y-1/2 opacity-[0.06] dark:opacity-[0.09]"
+          className="pointer-events-none absolute right-6 top-1/2 -translate-y-1/2 opacity-[0.18] dark:opacity-[0.09] text-foreground/80 dark:text-current hidden sm:block"
           width="260"
           height="260"
           viewBox="0 0 260 260"
@@ -105,7 +105,7 @@ export default async function CoursesPage({ params, searchParams }: Props) {
 
         {/* Content */}
         <div className="relative z-10 space-y-5">
-          <h1 className="gradient-text text-4xl font-bold tracking-tight sm:text-5xl">
+          <h1 className="gradient-text text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
             {t("title")}
           </h1>
           <p className="max-w-xl text-base text-muted-foreground">{t("subtitle")}</p>
@@ -113,18 +113,18 @@ export default async function CoursesPage({ params, searchParams }: Props) {
           {/* Stat pills — only shown when courses are available */}
           {courses.length > 0 && (
             <div className="flex flex-wrap gap-2 pt-1">
-              <span className="courses-stat-pill">
+              <span className="courses-stat-pill courses-stat-pill-light">
                 <span className="courses-stat-pill-dot diff-dot-beginner" />
                 {courses.length} {courses.length === 1 ? "course" : "courses"}
               </span>
               {totalLessons > 0 && (
-                <span className="courses-stat-pill">
+                <span className="courses-stat-pill courses-stat-pill-light">
                   <span className="courses-stat-pill-dot" style={{ background: "hsl(189 100% 50%)" }} />
                   {totalLessons} lessons
                 </span>
               )}
               {totalXP > 0 && (
-                <span className="courses-stat-pill">
+                <span className="courses-stat-pill courses-stat-pill-light">
                   <span className="courses-stat-pill-dot" style={{ background: "hsl(43 96% 52%)" }} />
                   {totalXP.toLocaleString()}+ XP available
                 </span>

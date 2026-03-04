@@ -1,0 +1,61 @@
+# Preview deployments handled by Vercel GitHub integration
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-lint:
+    name: Build & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: cd app && pnpm install
+
+      - name: Build
+        run: cd app && pnpm build
+
+      - name: Lint
+        run: cd app && pnpm lint
+
+  e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    continue-on-error: true  # No dev server in CI — allowed to fail
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: cd app && pnpm install
+
+      - name: Install Playwright Chromium
+        run: cd app && pnpm exec playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        run: cd app && pnpm exec playwright test

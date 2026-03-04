@@ -23,6 +23,7 @@ export interface SanityCourse {
   onChainCourseId: string;
   xpPerLesson: number;
   xpPerCourseCompletion?: number;
+  estimatedDuration?: number; // Total estimated minutes (REQ-403)
   tags: string[];
   prerequisites: string[];
   instructor?: SanityInstructor;
@@ -46,6 +47,7 @@ export interface SanityLesson {
 export interface SanityChallenge {
   _id: string;
   title: string;
+  description?: string;
   language: "ts" | "rust" | "json";
   starterCode: string;
   solutionCode: string;
@@ -76,6 +78,7 @@ const courseFields = `
   onChainCourseId,
   xpPerLesson,
   xpPerCourseCompletion,
+  estimatedDuration,
   tags,
   prerequisites,
   instructor-> {
@@ -95,7 +98,7 @@ const courseFields = `
       estimatedMinutes,
       videoUrl,
       challenge-> {
-        _id, title, language, starterCode, solutionCode, testCode, hints, difficulty, xpReward
+        _id, title, description, language, starterCode, solutionCode, testCode, hints, difficulty, xpReward
       }
     } | order(lessonIndex asc)
   } | order(order asc),
@@ -107,7 +110,7 @@ const courseFields = `
     estimatedMinutes,
     videoUrl,
     challenge-> {
-      _id, title, language, starterCode, solutionCode, testCode, hints, difficulty
+      _id, title, description, language, starterCode, solutionCode, testCode, hints, difficulty
     }
   } | order(lessonIndex asc),
   status,

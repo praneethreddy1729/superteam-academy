@@ -9,15 +9,18 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
-import { BookOpen, Clock, Zap, Heart, FolderOpen, Users } from "lucide-react";
+import { BookOpen, Clock, Zap, Heart, FolderOpen, Users, Map, AlertCircle, CheckCircle2 } from "lucide-react";
 import { EnrollButton } from "./EnrollButton";
+import { UnenrollButton } from "./UnenrollButton";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { LessonProgressIcon, CourseProgressBar } from "./CourseProgress";
 import { CourseReviews } from "./CourseReviews";
 import { useBookmarkStore } from "@/stores/bookmark-store";
 import { useProgressStore } from "@/stores/progress-store";
+import { useEnrollment } from "@/hooks/useEnrollment";
 import type { SanityCourse, SanityLesson } from "@/lib/sanity/queries";
 import { fetchCourse } from "@/lib/solana/queries";
+import { TRACK_I18N_KEYS } from "@/lib/tracks";
 
 interface CourseDetailProps {
   course: SanityCourse;
@@ -29,11 +32,17 @@ export function CourseDetail({ course }: CourseDetailProps) {
   const tb = useTranslations("bookmarks");
   const { toggleBookmark, isBookmarked } = useBookmarkStore();
   const isLessonComplete = useProgressStore((s) => s.isLessonComplete);
+  const getCourseProgress = useProgressStore((s) => s.getCourseProgress);
   const bookmarked = isBookmarked(course.slug);
   const courseId = course.onChainCourseId ?? "";
   const lessons = course.lessons ?? [];
   const modules = (course.modules ?? []).filter((m) => (m.lessons?.length ?? 0) > 0);
   const [enrollmentCount, setEnrollmentCount] = useState<number>(0);
+  const { enrollment, refetch: refetchEnrollment } = useEnrollment(courseId);
+
+  // Track name (REQ-189/405)
+  const trackI18nKey = course.trackId ? TRACK_I18N_KEYS[course.trackId] : null;
+  const trackName = trackI18nKey ? t(`tracks.${trackI18nKey}`) : null;
 
   useEffect(() => {
     if (!courseId) return;
@@ -46,7 +55,8 @@ export function CourseDetail({ course }: CourseDetailProps) {
     });
   }, [courseId]);
   const totalXp = lessons.length * course.xpPerLesson;
-  const totalMinutes = lessons.reduce((sum, l) => sum + (l.estimatedMinutes ?? 0), 0);
+  // Prefer CMS-level estimatedDuration (REQ-403); fall back to summing lesson minutes
+  const totalMinutes = course.estimatedDuration ?? lessons.reduce((sum, l) => sum + (l.estimatedMinutes ?? 0), 0);
   const difficultyLabel =
     course.difficulty === 1
       ? t("filter.beginner")
@@ -55,9 +65,9 @@ export function CourseDetail({ course }: CourseDetailProps) {
         : t("filter.advanced");
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-12">
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:py-12">
       {course.thumbnail?.asset?.url && (
-        <div className="relative aspect-[3/1] overflow-hidden rounded-xl mb-8">
+        <div className="relative aspect-[2/1] sm:aspect-[3/1] overflow-hidden rounded-xl mb-6 sm:mb-8">
           <Image
             src={course.thumbnail.asset.url}
             alt={course.title}
@@ -73,6 +83,7 @@ export function CourseDetail({ course }: CourseDetailProps) {
       <Breadcrumbs
         ariaLabel={tc("breadcrumb")}
         items={[
+          { label: tc("home"), href: "/" },
           { label: tc("courses"), href: "/courses" },
           { label: course.title },
         ]}
@@ -81,19 +92,25 @@ export function CourseDetail({ course }: CourseDetailProps) {
         {/* Main Content */}
         <div className="space-y-8 lg:col-span-2">
           <div className="space-y-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="outline">{difficultyLabel}</Badge>
+              {trackName && (
+                <Badge variant="outline" className="gap-1 text-primary border-primary/40">
+                  <Map className="h-3 w-3" aria-hidden="true" />
+                  {trackName}
+                </Badge>
+              )}
               {(course.tags ?? []).map((tag) => (
                 <Badge key={tag} variant="secondary" className="text-xs">
                   {tag}
                 </Badge>
               ))}
             </div>
-            <h1 className="text-3xl font-bold">{course.title}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold">{course.title}</h1>
             <p className="text-lg text-muted-foreground">{course.description}</p>
           </div>
 
-          <div className="flex items-center gap-6 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
             <span className="flex items-center gap-1">
               <BookOpen className="h-4 w-4" aria-hidden="true" />
               {lessons.length} {t("detail.lessonCount")}
@@ -131,10 +148,10 @@ export function CourseDetail({ course }: CourseDetailProps) {
                       className="rounded-lg border border-border/50 px-4 [&:not(:last-child)]:mb-0"
                     >
                       <AccordionTrigger className="py-3 hover:no-underline">
-                        <div className="flex items-center gap-2 text-left">
+                        <div className="flex items-center gap-2 text-left min-w-0">
                           <FolderOpen className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                          <span className="font-semibold">{mod.title}</span>
-                          <span className="ml-2 text-xs text-muted-foreground font-normal">
+                          <span className="font-semibold truncate">{mod.title}</span>
+                          <span className="ml-2 text-xs text-muted-foreground font-normal shrink-0">
                             {modLessons.length} {t("detail.lessonCount")} · {modMinutes} {tc("minutesShort")}
                           </span>
                         </div>
@@ -225,21 +242,49 @@ export function CourseDetail({ course }: CourseDetailProps) {
             <CardContent className="space-y-4">
               <CourseProgressBar courseId={courseId} totalLessons={lessons.length} />
 
+              {/* Track name (REQ-189/405) */}
+              {trackName && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Map className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <span className="text-muted-foreground">{t("detail.track")}:</span>
+                  <span className="font-medium">{trackName}</span>
+                </div>
+              )}
+
               {course.prerequisites && course.prerequisites.length > 0 && (
                 <div className="space-y-2 border-t border-border pt-4">
                   <p className="text-sm font-medium">{t("detail.prerequisites")}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {course.prerequisites.map((prereq) => (
-                      <Link
-                        key={prereq}
-                        href={`/courses/${prereq}`}
-                      >
-                        <Badge variant="secondary" className="cursor-pointer hover:bg-secondary/80">
-                          {prereq}
-                        </Badge>
-                      </Link>
-                    ))}
+                  <div className="space-y-1.5">
+                    {course.prerequisites.map((prereq) => {
+                      // prereq is a course slug. Progress store is keyed by onChainCourseId.
+                      // If slugs match onChainCourseId this resolves correctly; otherwise
+                      // falls back to showing the "Required" indicator.
+                      const prereqProgress = getCourseProgress(prereq, 1);
+                      const isCompleted = prereqProgress >= 100;
+                      return (
+                        <Link
+                          key={prereq}
+                          href={`/courses/${prereq}`}
+                          className="flex items-center gap-2 rounded-md border border-border/50 px-3 py-2 text-sm transition-colors hover:border-primary/50 hover:bg-muted/30"
+                        >
+                          {isCompleted ? (
+                            <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                          ) : (
+                            <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
+                          )}
+                          <span className="flex-1 truncate">{prereq}</span>
+                          {!isCompleted && (
+                            <span className="text-xs text-amber-500 shrink-0">
+                              {t("detail.prerequisiteIncomplete")}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
                   </div>
+                  {course.prerequisites.some((prereq) => getCourseProgress(prereq, 1) < 100) && (
+                    <p className="text-xs text-muted-foreground">{t("detail.prerequisiteHint")}</p>
+                  )}
                 </div>
               )}
 
@@ -249,6 +294,14 @@ export function CourseDetail({ course }: CourseDetailProps) {
                 prerequisiteCourseId={course.prerequisites?.[0]}
                 disabled={!courseId}
               />
+
+              {enrollment && courseId && (
+                <UnenrollButton
+                  courseId={courseId}
+                  onUnenrolled={refetchEnrollment}
+                  className="w-full justify-center"
+                />
+              )}
 
               <Button
                 variant="outline"

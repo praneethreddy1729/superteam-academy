@@ -1,6 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/routing";
 import { GraduationCap } from "lucide-react";
+import Image from "next/image";
 import { NewsletterForm } from "./NewsletterForm";
 
 export async function Footer() {
@@ -27,9 +28,16 @@ export async function Footer() {
       </div>
 
       <div className="mx-auto max-w-7xl px-4 py-12">
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-4">
           <div className="space-y-4">
             <div className="flex items-center gap-2">
+              <Image
+                src="/superteam-brasil.png"
+                alt="Superteam Brasil"
+                width={36}
+                height={36}
+                className="rounded-md"
+              />
               <GraduationCap className="h-6 w-6 text-primary" aria-hidden="true" />
               <span className="font-bold">Superteam Academy</span>
             </div>
@@ -78,8 +86,14 @@ export async function Footer() {
             </div>
           </div>
         </div>
-        <div className="mt-8 border-t border-border/40 pt-8 text-center text-sm text-muted-foreground">
-          {t("copyright", { year: new Date().getFullYear() })}
+        <div className="mt-8 border-t border-border/40 pt-8 flex flex-col items-center gap-2 sm:flex-row sm:justify-between text-sm text-muted-foreground">
+          <span>{t("copyright", { year: new Date().getFullYear() })}</span>
+          <span
+            className="font-mono text-xs tracking-widest uppercase"
+            style={{ color: "rgba(20, 241, 149, 0.5)" }}
+          >
+            Powered by Solana
+          </span>
         </div>
       </div>
     </footer>

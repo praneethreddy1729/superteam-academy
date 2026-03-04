@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, Send, Trash2, Sparkles, Loader2, Bot } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -19,6 +20,7 @@ const SUGGESTED_QUESTIONS = [
 ];
 
 export function AIChatbot() {
+    const t = useTranslations("chat");
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
@@ -71,7 +73,7 @@ export function AIChatbot() {
             const assistantMessage: Message = {
                 id: crypto.randomUUID(),
                 role: "assistant",
-                content: data.content || data.error || "Something went wrong.",
+                content: data.content || data.error || t("error"),
             };
 
             setMessages((prev) => [...prev, assistantMessage]);
@@ -81,7 +83,7 @@ export function AIChatbot() {
                 {
                     id: crypto.randomUUID(),
                     role: "assistant",
-                    content: "Network error — please check your connection and try again.",
+                    content: t("networkError"),
                 },
             ]);
         } finally {
@@ -113,7 +115,7 @@ export function AIChatbot() {
                         whileTap={{ scale: 0.95 }}
                         onClick={() => setIsOpen(true)}
                         className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/80 text-white shadow-[0_0_25px_rgba(20,241,149,0.3)] hover:shadow-[0_0_35px_rgba(20,241,149,0.5)] transition-shadow"
-                        aria-label="Open AI Chatbot"
+                        aria-label={t("open")}
                     >
                         <MessageCircle className="h-6 w-6" />
                         {/* Pulse ring */}
@@ -130,33 +132,33 @@ export function AIChatbot() {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 20, scale: 0.95 }}
                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                        className="fixed bottom-6 right-6 z-50 flex w-[400px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-card/95 backdrop-blur-xl shadow-[0_0_40px_rgba(0,0,0,0.5),0_0_20px_rgba(20,241,149,0.1)]"
+                        className="fixed bottom-6 right-6 z-50 flex w-[400px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border/40 dark:border-white/10 bg-card/95 backdrop-blur-xl shadow-[0_0_40px_rgba(0,0,0,0.5),0_0_20px_rgba(20,241,149,0.1)]"
                         style={{ height: "min(600px, calc(100vh - 6rem))" }}
                     >
                         {/* Header */}
-                        <div className="flex items-center justify-between border-b border-white/10 bg-gradient-to-r from-primary/10 to-transparent px-4 py-3">
+                        <div className="flex items-center justify-between border-b border-border/40 dark:border-white/10 bg-gradient-to-r from-primary/10 to-transparent px-4 py-3">
                             <div className="flex items-center gap-3">
                                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/60 shadow-lg shadow-primary/20">
                                     <Bot className="h-5 w-5 text-white" />
                                 </div>
                                 <div>
                                     <h3 className="text-sm font-bold text-foreground">Academy AI</h3>
-                                    <p className="text-[11px] text-muted-foreground">Solana learning assistant</p>
+                                    <p className="text-[11px] text-muted-foreground">{t("subtitle")}</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-1">
                                 <button
                                     onClick={clearChat}
-                                    className="rounded-lg p-2 text-muted-foreground hover:bg-white/5 hover:text-foreground transition-colors"
-                                    aria-label="Clear chat"
-                                    title="Clear chat"
+                                    className="rounded-lg p-2 text-muted-foreground hover:bg-muted/30 dark:hover:bg-white/5 hover:text-foreground transition-colors"
+                                    aria-label={t("clearChat")}
+                                    title={t("clearChat")}
                                 >
                                     <Trash2 className="h-4 w-4" />
                                 </button>
                                 <button
                                     onClick={() => setIsOpen(false)}
-                                    className="rounded-lg p-2 text-muted-foreground hover:bg-white/5 hover:text-foreground transition-colors"
-                                    aria-label="Close chatbot"
+                                    className="rounded-lg p-2 text-muted-foreground hover:bg-muted/30 dark:hover:bg-white/5 hover:text-foreground transition-colors"
+                                    aria-label={t("close")}
                                 >
                                     <X className="h-4 w-4" />
                                 </button>
@@ -171,17 +173,17 @@ export function AIChatbot() {
                                         <Sparkles className="h-8 w-8 text-primary" />
                                     </div>
                                     <h4 className="mb-1 text-sm font-semibold text-foreground">
-                                        Hi! I&apos;m your Solana learning assistant.
+                                        {t("greeting")}
                                     </h4>
                                     <p className="mb-6 text-xs text-muted-foreground">
-                                        Ask me about Solana, Anchor, Rust, or any lesson topic.
+                                        {t("greetingDesc")}
                                     </p>
                                     <div className="flex flex-wrap justify-center gap-2">
                                         {SUGGESTED_QUESTIONS.map((q) => (
                                             <button
                                                 key={q}
                                                 onClick={() => sendMessage(q)}
-                                                className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-all"
+                                                className="rounded-full border border-border/40 dark:border-white/10 bg-muted/20 dark:bg-white/5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-all"
                                             >
                                                 {q}
                                             </button>
@@ -197,11 +199,11 @@ export function AIChatbot() {
                                         <div
                                             className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === "user"
                                                 ? "bg-primary text-white rounded-br-md"
-                                                : "bg-white/5 border border-white/10 text-foreground rounded-bl-md"
+                                                : "bg-muted/20 dark:bg-white/5 border border-border/40 dark:border-white/10 text-foreground rounded-bl-md"
                                                 }`}
                                         >
                                             {msg.role === "assistant" ? (
-                                                <div className="chat-markdown prose prose-sm prose-invert max-w-none [&_p]:m-0 [&_p+p]:mt-2 [&_pre]:bg-black/30 [&_pre]:rounded-lg [&_pre]:p-3 [&_pre]:my-2 [&_code]:text-xs [&_code]:text-secondary [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_strong]:text-white">
+                                                <div className="chat-markdown prose prose-sm dark:prose-invert max-w-none [&_p]:m-0 [&_p+p]:mt-2 [&_pre]:bg-muted/50 dark:[&_pre]:bg-black/30 [&_pre]:rounded-lg [&_pre]:p-3 [&_pre]:my-2 [&_code]:text-xs [&_code]:text-secondary [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_strong]:text-foreground dark:[&_strong]:text-white">
                                                     <ReactMarkdown>{msg.content}</ReactMarkdown>
                                                 </div>
                                             ) : (
@@ -213,9 +215,9 @@ export function AIChatbot() {
                             )}
                             {isLoading && (
                                 <div className="flex justify-start">
-                                    <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-muted-foreground rounded-bl-md">
+                                    <div className="flex items-center gap-2 rounded-2xl border border-border/40 dark:border-white/10 bg-muted/20 dark:bg-white/5 px-4 py-3 text-sm text-muted-foreground rounded-bl-md">
                                         <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                                        <span>Thinking...</span>
+                                        <span>{t("thinking")}</span>
                                     </div>
                                 </div>
                             )}
@@ -223,16 +225,16 @@ export function AIChatbot() {
                         </div>
 
                         {/* Input Area */}
-                        <div className="border-t border-white/10 bg-card/50 p-3">
+                        <div className="border-t border-border/40 dark:border-white/10 bg-card/50 p-3">
                             <div className="flex items-end gap-2">
                                 <textarea
                                     ref={inputRef}
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     onKeyDown={handleKeyDown}
-                                    placeholder="Ask about Solana..."
+                                    placeholder={t("inputPlaceholder")}
                                     rows={1}
-                                    className="flex-1 resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/20 transition-colors font-mono"
+                                    className="flex-1 resize-none rounded-xl border border-border/40 dark:border-white/10 bg-muted/20 dark:bg-white/5 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/20 transition-colors font-mono"
                                     style={{ maxHeight: "120px" }}
                                     disabled={isLoading}
                                 />
@@ -240,13 +242,13 @@ export function AIChatbot() {
                                     onClick={() => sendMessage(input)}
                                     disabled={!input.trim() || isLoading}
                                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-primary/20 transition-all"
-                                    aria-label="Send message"
+                                    aria-label={t("sendMessage")}
                                 >
                                     <Send className="h-4 w-4" />
                                 </button>
                             </div>
                             <p className="mt-1.5 text-center text-[10px] text-muted-foreground/40">
-                                Shift+Enter for new line
+                                {t("shiftEnterHint")}
                             </p>
                         </div>
                     </motion.div>

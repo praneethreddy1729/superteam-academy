@@ -20,7 +20,10 @@ export type AchievementEvent =
   | "course_complete"
   | "streak_update"
   | "challenge_complete"
-  | "review_submit";
+  | "review_submit"
+  | "xp_update"
+  | "credential_earned"
+  | "forum_post";
 
 export interface AchievementContext {
   wallet: string;
@@ -44,12 +47,22 @@ export interface AchievementContext {
   enrollmentTimestamp?: number;
   /** timestamp of the last lesson completion (unix seconds) for speed_runner check */
   lastLessonTimestamp?: number;
+  /** duration in seconds the user spent on the most recent lesson (for quick_learner) */
+  lessonDurationSeconds?: number;
   /** whether this is the user's very first lesson ever */
   isFirstLesson?: boolean;
   /** whether this challenge was passed on the very first attempt */
   isFirstAttempt?: boolean;
   /** whether this is the user's first course review */
   isFirstReview?: boolean;
+  /** total XP earned by this learner across all time */
+  totalXpEarned?: number;
+  /** total on-chain credential NFTs earned */
+  totalCredentialsEarned?: number;
+  /** unique subject-category IDs completed (for category_explorer) */
+  completedCategoryIds?: string[];
+  /** unique locale codes of completed courses (for polyglot_learner) */
+  completedLanguages?: string[];
   /** callback to trigger after unlock — used by hook to show toast/notification */
   onUnlocked?: (achievementId: string, xpReward: number) => void;
 }
@@ -136,15 +149,27 @@ async function tryTrigger(
 
 async function handleLessonComplete(ctx: AchievementContext): Promise<void> {
   const promises: Promise<void>[] = [];
+  const total = ctx.totalLessonsCompleted ?? 0;
 
   // first_steps (index 0): user's very first lesson ever
   if (ctx.isFirstLesson) {
     promises.push(tryTrigger("first_steps", ctx));
   }
 
+  // lesson milestones
+  if (total >= 5)  promises.push(tryTrigger("lesson_5", ctx));
+  if (total >= 10) promises.push(tryTrigger("lesson_10", ctx));
+  if (total >= 25) promises.push(tryTrigger("lesson_25", ctx));
+  if (total >= 50) promises.push(tryTrigger("lesson_50", ctx));
+
   // top_contributor (index 11): 10+ total lessons completed
-  if ((ctx.totalLessonsCompleted ?? 0) >= 10) {
+  if (total >= 10) {
     promises.push(tryTrigger("top_contributor", ctx));
+  }
+
+  // quick_learner: lesson completed in under 5 minutes (300 seconds)
+  if (ctx.lessonDurationSeconds !== undefined && ctx.lessonDurationSeconds <= 300) {
+    promises.push(tryTrigger("quick_learner", ctx));
   }
 
   await Promise.allSettled(promises);
@@ -152,9 +177,15 @@ async function handleLessonComplete(ctx: AchievementContext): Promise<void> {
 
 async function handleCourseComplete(ctx: AchievementContext): Promise<void> {
   const promises: Promise<void>[] = [];
+  const totalCourses = ctx.totalCoursesCompleted ?? 0;
 
   // course_completer (index 1): first course ever finalized
   promises.push(tryTrigger("course_completer", ctx));
+
+  // course milestones
+  if (totalCourses >= 3)  promises.push(tryTrigger("course_3", ctx));
+  if (totalCourses >= 5)  promises.push(tryTrigger("course_5", ctx));
+  if (totalCourses >= 10) promises.push(tryTrigger("course_10", ctx));
 
   // speed_runner (index 2): all lessons in a course completed within 24h of enrollment
   if (
@@ -165,6 +196,7 @@ async function handleCourseComplete(ctx: AchievementContext): Promise<void> {
     const twentyFourHoursInSeconds = 24 * 60 * 60;
     if (elapsedSeconds <= twentyFourHoursInSeconds) {
       promises.push(tryTrigger("speed_runner", ctx));
+      promises.push(tryTrigger("marathon_day", ctx));
     }
   }
 
@@ -191,6 +223,16 @@ async function handleCourseComplete(ctx: AchievementContext): Promise<void> {
     promises.push(tryTrigger("early_adopter", ctx));
   }
 
+  // category_explorer: courses completed in 3+ distinct subject categories
+  if ((ctx.completedCategoryIds?.length ?? 0) >= 3) {
+    promises.push(tryTrigger("category_explorer", ctx));
+  }
+
+  // polyglot_learner: courses completed in 2+ distinct locales
+  if ((ctx.completedLanguages?.length ?? 0) >= 2) {
+    promises.push(tryTrigger("polyglot_learner", ctx));
+  }
+
   await Promise.allSettled(promises);
 }
 
@@ -198,20 +240,18 @@ async function handleStreakUpdate(ctx: AchievementContext): Promise<void> {
   const days = ctx.streakDays ?? 0;
   const promises: Promise<void>[] = [];
 
+  // streak_3: streak >= 3 days
+  if (days >= 3)   promises.push(tryTrigger("streak_3", ctx));
   // week_warrior (index 3): streak >= 7 days
-  if (days >= 7) {
-    promises.push(tryTrigger("week_warrior", ctx));
-  }
-
+  if (days >= 7)   promises.push(tryTrigger("week_warrior", ctx));
+  // streak_14: streak >= 14 days
+  if (days >= 14)  promises.push(tryTrigger("streak_14", ctx));
   // monthly_master (index 4): streak >= 30 days
-  if (days >= 30) {
-    promises.push(tryTrigger("monthly_master", ctx));
-  }
-
+  if (days >= 30)  promises.push(tryTrigger("monthly_master", ctx));
+  // streak_60: streak >= 60 days
+  if (days >= 60)  promises.push(tryTrigger("streak_60", ctx));
   // consistency_king (index 5): streak >= 100 days
-  if (days >= 100) {
-    promises.push(tryTrigger("consistency_king", ctx));
-  }
+  if (days >= 100) promises.push(tryTrigger("consistency_king", ctx));
 
   await Promise.allSettled(promises);
 }
@@ -235,6 +275,37 @@ async function handleReviewSubmit(ctx: AchievementContext): Promise<void> {
   // Share-based trigger is handled separately in triggerHelperIfEligible().
 
   await Promise.allSettled(promises);
+}
+
+async function handleXpUpdate(ctx: AchievementContext): Promise<void> {
+  const total = ctx.totalXpEarned ?? 0;
+  const promises: Promise<void>[] = [];
+
+  if (total >= 100)   promises.push(tryTrigger("xp_100", ctx));
+  if (total >= 500)   promises.push(tryTrigger("xp_500", ctx));
+  if (total >= 1000)  promises.push(tryTrigger("xp_1000", ctx));
+  if (total >= 5000)  promises.push(tryTrigger("xp_5000", ctx));
+  if (total >= 10000) promises.push(tryTrigger("xp_10000", ctx));
+
+  await Promise.allSettled(promises);
+}
+
+async function handleCredentialEarned(ctx: AchievementContext): Promise<void> {
+  const total = ctx.totalCredentialsEarned ?? 0;
+  const promises: Promise<void>[] = [];
+
+  // first_credential: earning any credential
+  promises.push(tryTrigger("first_credential", ctx));
+
+  if (total >= 3)  promises.push(tryTrigger("credential_3", ctx));
+  if (total >= 5)  promises.push(tryTrigger("credential_5", ctx));
+  if (total >= 10) promises.push(tryTrigger("credential_10", ctx));
+
+  await Promise.allSettled(promises);
+}
+
+async function handleForumPost(ctx: AchievementContext): Promise<void> {
+  await tryTrigger("first_post", ctx);
 }
 
 // ---------------------------------------------------------------------------
@@ -265,6 +336,15 @@ export async function checkAndTriggerAchievements(
         break;
       case "review_submit":
         await handleReviewSubmit(context);
+        break;
+      case "xp_update":
+        await handleXpUpdate(context);
+        break;
+      case "credential_earned":
+        await handleCredentialEarned(context);
+        break;
+      case "forum_post":
+        await handleForumPost(context);
         break;
     }
   } catch (err) {
@@ -303,7 +383,7 @@ export function getCourseShareCount(): number {
 }
 
 /**
- * Call after recordCourseShare() to check if helper achievement should trigger.
+ * Call after recordCourseShare() to check if helper/course_sharer achievements should trigger.
  * Context must include wallet and unlockedBitmap.
  */
 export async function triggerHelperIfEligible(
@@ -311,6 +391,14 @@ export async function triggerHelperIfEligible(
 ): Promise<void> {
   try {
     const shareCount = getCourseShareCount();
+    // course_sharer: shared at least once
+    if (shareCount >= 1) {
+      await tryTrigger("course_sharer", {
+        ...context,
+        unlockedBitmap: context.unlockedBitmap,
+      });
+    }
+    // helper: shared 3+ times
     if (shareCount >= HELPER_THRESHOLD) {
       await tryTrigger("helper", {
         ...context,
@@ -319,6 +407,56 @@ export async function triggerHelperIfEligible(
     }
   } catch (err) {
     logger.error("[AchievementTrigger] Error in triggerHelperIfEligible:", err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helper: mentor achievement via localStorage help-count tracking
+// ---------------------------------------------------------------------------
+
+const HELP_COUNT_KEY = "superteam-learners-helped";
+const MENTOR_THRESHOLD = 5;
+
+/** Record helping a learner and return the new total count. */
+export function recordLearnerHelped(): number {
+  try {
+    const raw = localStorage.getItem(HELP_COUNT_KEY);
+    const count = raw ? (parseInt(raw, 10) || 0) : 0;
+    const next = count + 1;
+    localStorage.setItem(HELP_COUNT_KEY, String(next));
+    return next;
+  } catch {
+    return 0;
+  }
+}
+
+/** Get current learners-helped count from localStorage. */
+export function getLearnersHelpedCount(): number {
+  try {
+    const raw = localStorage.getItem(HELP_COUNT_KEY);
+    return raw ? (parseInt(raw, 10) || 0) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Call after recordLearnerHelped() to check if mentor achievement should trigger.
+ * Context must include wallet and unlockedBitmap.
+ */
+export async function triggerMentorIfEligible(
+  context: Pick<AchievementContext, "wallet" | "unlockedBitmap" | "signMessage" | "onUnlocked">
+): Promise<void> {
+  try {
+    const helpCount = getLearnersHelpedCount();
+    if (helpCount >= MENTOR_THRESHOLD) {
+      await tryTrigger("mentor", {
+        ...context,
+        unlockedBitmap: context.unlockedBitmap,
+      });
+    }
+  } catch (err) {
+    logger.error("[AchievementTrigger] Error in triggerMentorIfEligible:", err);
   }
 }
 

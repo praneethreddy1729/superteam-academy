@@ -1,4 +1,5 @@
 import { SystemProgram, Transaction } from "@solana/web3.js";
+import type { PublicKey } from "@solana/web3.js";
 import { getProgramWithWallet } from "./program";
 import { getCoursePda, getEnrollmentPda } from "./pdas";
 import { getTypedMethods } from "./typed-program";
@@ -35,4 +36,22 @@ export async function buildEnrollTx(
   }
 
   return await builder.transaction();
+}
+
+export async function buildCloseEnrollmentTx(
+  wallet: AnchorWallet,
+  courseId: string,
+  coursePubkey: PublicKey
+): Promise<Transaction> {
+  const program = await getProgramWithWallet(wallet);
+  const [enrollmentPda] = getEnrollmentPda(courseId, wallet.publicKey);
+
+  return await getTypedMethods(program)
+    .closeEnrollment()
+    .accountsPartial({
+      course: coursePubkey,
+      enrollment: enrollmentPda,
+      learner: wallet.publicKey,
+    })
+    .transaction();
 }

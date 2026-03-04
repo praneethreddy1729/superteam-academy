@@ -80,17 +80,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           );
           if (!isValid) return null;
 
+          // Strict format: "Sign in to Superteam Academy\nWallet: <base58>\nTimestamp: <number>"
           const msgStr = credentials.message as string;
-          if (!msgStr.includes("Sign in to Superteam Academy")) return null;
+          const expectedPrefix = "Sign in to Superteam Academy\nWallet: ";
+          if (!msgStr.startsWith(expectedPrefix)) return null;
 
+          // Validate wallet address in message matches claimed publicKey
+          const lines = msgStr.split("\n");
+          const walletLine = lines.find(l => l.startsWith("Wallet: "));
+          const messagePubkey = walletLine?.replace("Wallet: ", "").trim();
+          if (messagePubkey !== (credentials.publicKey as string)) return null;
+
+          // Mandatory timestamp check
           const timestampMatch = msgStr.match(/Timestamp: (\d+)/);
-          if (timestampMatch) {
-            const tsStr = timestampMatch[1];
-            if (tsStr) {
-              const ts = parseInt(tsStr);
-              if (Date.now() - ts > 5 * 60 * 1000) return null;
-            }
-          }
+          if (!timestampMatch?.[1]) return null;
+          const ts = parseInt(timestampMatch[1]);
+          if (Date.now() - ts > 5 * 60 * 1000) return null;
 
           const address = publicKey.toBase58();
           return {

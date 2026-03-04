@@ -7,6 +7,8 @@ import { Download, Twitter } from "lucide-react";
 interface CertificateDownloadProps {
   courseName: string;
   ownerAddress: string | null;
+  /** Display name (profile name) for the recipient. Shown instead of wallet address when set. */
+  recipientName?: string | null;
   completionDate: string | null;
   xpEarned: string | null;
   /** Full URL of the certificate page, used for the Share on X intent */
@@ -53,6 +55,7 @@ function buildCertificateCanvas(
   ownerAddress: string | null,
   completionDate: string | null,
   xpEarned: string | null,
+  recipientName?: string | null,
 ): HTMLCanvasElement {
   const W = 1200;
   const H = 630;
@@ -146,13 +149,17 @@ function buildCertificateCanvas(
   ctx.font = "18px system-ui, sans-serif";
   ctx.fillText("This certifies that", W / 2, 260);
 
-  // ── Recipient wallet address ───────────────────────────────────────────────
-  const truncated = ownerAddress
-    ? `${ownerAddress.slice(0, 6)}...${ownerAddress.slice(-6)}`
-    : "Unknown Recipient";
+  // ── Recipient name or wallet address ─────────────────────────────────────
+  const displayRecipient = recipientName
+    ? recipientName
+    : ownerAddress
+      ? `${ownerAddress.slice(0, 6)}...${ownerAddress.slice(-6)}`
+      : "Unknown Recipient";
   ctx.fillStyle = GREEN;
-  ctx.font = "bold 28px 'Courier New', monospace";
-  ctx.fillText(truncated, W / 2, 305);
+  ctx.font = recipientName
+    ? "bold 32px system-ui, sans-serif"
+    : "bold 28px 'Courier New', monospace";
+  ctx.fillText(displayRecipient, W / 2, 305);
 
   // ── "has successfully completed" label ────────────────────────────────────
   ctx.fillStyle = MUTED;
@@ -226,6 +233,7 @@ function buildCertificateCanvas(
 export function CertificateDownload({
   courseName,
   ownerAddress,
+  recipientName,
   completionDate,
   xpEarned,
   certificateUrl,
@@ -241,6 +249,7 @@ export function CertificateDownload({
         ownerAddress,
         completionDate,
         xpEarned,
+        recipientName,
       );
       await new Promise<void>((resolve, reject) => {
         canvas.toBlob((blob) => {
@@ -261,7 +270,7 @@ export function CertificateDownload({
     } finally {
       setDownloading(false);
     }
-  }, [courseName, ownerAddress, completionDate, xpEarned, filename]);
+  }, [courseName, ownerAddress, recipientName, completionDate, xpEarned, filename]);
 
   const handleShareX = useCallback(() => {
     const text = encodeURIComponent(
@@ -290,7 +299,7 @@ export function CertificateDownload({
 
       <Button
         variant="outline"
-        className="gap-2 border-[#14F195]/40 text-[#14F195] hover:border-[#14F195] hover:bg-[#14F195]/10"
+        className="gap-2 border-[#0d9668]/40 dark:border-[#14F195]/40 text-[#0d9668] dark:text-[#14F195] hover:border-[#0d9668] dark:hover:border-[#14F195] hover:bg-[#0d9668]/10 dark:hover:bg-[#14F195]/10"
         onClick={handleShareX}
         aria-label="Share certificate on X (Twitter)"
       >

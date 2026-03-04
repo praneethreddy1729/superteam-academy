@@ -35,7 +35,7 @@ function buildDayLabels(locale: string): string[] {
 function getCellColor(active: boolean, isFuture: boolean, isFreeze: boolean): string {
   if (isFuture) return "bg-muted/15 dark:bg-muted/8";
   if (isFreeze) return "bg-blue-500/40 dark:bg-blue-500/30";
-  if (active) return "bg-[#14F195] dark:bg-[#14F195] opacity-90";
+  if (active) return "bg-[#0d9668] dark:bg-[#14F195] opacity-90";
   return "bg-muted/40 dark:bg-muted/20";
 }
 
@@ -136,9 +136,9 @@ export function ActivityHeatmap() {
           </p>
         </div>
 
-        <div className="rounded-xl border border-[#14F195]/20 bg-[#14F195]/5 px-3 py-2.5">
+        <div className="rounded-xl border border-[var(--sol-green-hex)]/20 bg-[var(--sol-green-hex)]/5 px-3 py-2.5">
           <div className="flex items-center gap-1.5 mb-1">
-            <Calendar className="h-3.5 w-3.5 text-[#14F195] shrink-0" aria-hidden="true" />
+            <Calendar className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--sol-green-hex)" }} aria-hidden="true" />
             <span className="text-[11px] font-medium text-muted-foreground">Active Days</span>
           </div>
           <p className="text-xl font-bold tabular-nums">
@@ -165,7 +165,7 @@ export function ActivityHeatmap() {
           {MILESTONE_BADGES.filter((b) => streakMilestonesReached.includes(b.days)).map((badge) => (
             <div
               key={badge.days}
-              className="flex items-center gap-1.5 rounded-full border border-[#14F195]/30 bg-[#14F195]/10 px-3 py-1 text-xs font-semibold text-[#14F195]"
+              className="flex items-center gap-1.5 rounded-full border border-[#0d9668]/30 dark:border-[#14F195]/30 bg-[#0d9668]/10 dark:bg-[#14F195]/10 px-3 py-1 text-xs font-semibold text-[#0d9668] dark:text-[#14F195]"
               title={badge.label}
             >
               <span aria-hidden="true">{badge.icon}</span>
@@ -251,9 +251,9 @@ export function ActivityHeatmap() {
           <div className="flex items-center gap-2 pt-1 pl-9 flex-wrap">
             <span className="text-[10px] text-muted-foreground">Less</span>
             <div className="h-4 w-4 rounded-sm bg-muted/40 dark:bg-muted/20" />
-            <div className="h-4 w-4 rounded-sm bg-[#14F195]/30" />
-            <div className="h-4 w-4 rounded-sm bg-[#14F195]/60" />
-            <div className="h-4 w-4 rounded-sm bg-[#14F195] opacity-90" />
+            <div className="h-4 w-4 rounded-sm bg-[#0d9668]/30 dark:bg-[#14F195]/30" />
+            <div className="h-4 w-4 rounded-sm bg-[#0d9668]/60 dark:bg-[#14F195]/60" />
+            <div className="h-4 w-4 rounded-sm bg-[#0d9668] dark:bg-[#14F195] opacity-90" />
             <span className="text-[10px] text-muted-foreground">More</span>
             <span className="text-[10px] text-muted-foreground ml-2">
               · Blue = streak freeze used

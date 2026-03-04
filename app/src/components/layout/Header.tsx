@@ -1,64 +1,275 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useTranslations } from "next-intl";
-import { Link } from "@/i18n/routing";
+import { Link, usePathname } from "@/i18n/routing";
 import { WalletButton } from "@/components/wallet/WalletButton";
 import { SignInButton } from "@/components/auth/SignInButton";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
-import { Search, Sparkles } from "lucide-react";
+import { Search, Menu } from "lucide-react";
 import { CommandPalette } from "@/components/search/CommandPalette";
 import { NavGamification } from "@/components/layout/NavGamification";
+import { LocaleSwitcher } from "@/components/layout/LocaleSwitcher";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { cn } from "@/lib/utils";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetClose,
+} from "@/components/ui/sheet";
+
+const navItems = [
+  { href: "/courses" as const, key: "courses" as const },
+  { href: "/dashboard" as const, key: "dashboard" as const },
+  { href: "/certificates" as const, key: "certificates" as const },
+  { href: "/leaderboard" as const, key: "leaderboard" as const },
+  { href: "/community" as const, key: "community" as const },
+];
+
+function AcademyLogo() {
+  return (
+    <Image
+      src="/superteam-brasil.png"
+      alt="Superteam Brasil"
+      width={30}
+      height={30}
+      className="rounded-md"
+      priority
+    />
+  );
+}
 
 export function Header() {
   const tc = useTranslations("common");
+  const t = useTranslations("nav");
+  const pathname = usePathname();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <header
       role="banner"
-      className="sticky top-0 z-30 w-full border-b border-border/30 bg-background/80 backdrop-blur-xl"
+      className="sticky top-0 z-40 w-full bg-background/94 dark:bg-[#08080B]/94 border-b border-border/30 dark:border-white/[0.045]"
+      style={{
+        backdropFilter: "blur(24px)",
+        WebkitBackdropFilter: "blur(24px)",
+      }}
     >
-      <div className="flex h-12 items-center justify-between px-4">
-        {/* Mobile logo — only visible on <md where sidebar is hidden */}
-        <Link href="/" className="flex items-center gap-2 md:hidden">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-primary via-primary/80 to-secondary/60 shadow-lg shadow-primary/25">
-            <Sparkles className="h-4 w-4 text-primary-foreground" aria-hidden="true" />
+      {/* Gradient accent strip at bottom edge */}
+      <div
+        aria-hidden="true"
+        className="absolute bottom-0 left-0 right-0 h-[1px] pointer-events-none"
+        style={{
+          background: "linear-gradient(90deg, transparent 0%, rgba(20,241,149,0.25) 25%, rgba(20,241,149,0.4) 50%, rgba(153,69,255,0.2) 75%, transparent 100%)",
+        }}
+      />
+
+      <div className="mx-auto flex h-16 max-w-7xl items-center px-4 sm:px-6 gap-1 lg:gap-2 xl:gap-3">
+
+        {/* Left — Logo (fixed width, never shrinks) */}
+        <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
+          <AcademyLogo />
+          <div className="hidden sm:flex flex-col leading-none">
+            <span
+              className="text-[13px] font-bold tracking-tight text-foreground"
+              style={{ fontFamily: "var(--font-mono)" }}
+            >
+              Super<span style={{ color: "var(--sol-green-hex)" }}>team</span>
+            </span>
+            <span
+              className="text-[9px] tracking-[0.18em] uppercase text-muted-foreground/60"
+              style={{ fontFamily: "var(--font-mono)" }}
+            >
+              Academy
+            </span>
           </div>
-          <span className="text-sm font-bold tracking-tight">
-            <span className="text-foreground">Super</span>
-            <span className="gradient-text">team</span>
-          </span>
         </Link>
 
-        {/* Desktop: empty spacer since sidebar has the logo */}
-        <div className="hidden md:block" />
+        {/* Center — Nav links (lg+ only, below that they go in Sheet) */}
+        {/* flex-1 + min-w-0 lets this shrink gracefully instead of overflowing */}
+        <nav
+          aria-label={tc("mainNavigation")}
+          className="hidden lg:flex flex-1 items-center justify-center min-w-0 overflow-hidden"
+        >
+          {navItems.map((item) => {
+            const isActive =
+              pathname === item.href || pathname.startsWith(`${item.href}/`);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={isActive ? "page" : undefined}
+                className={cn(
+                  "relative shrink min-w-0 px-1.5 lg:px-2 xl:px-3 2xl:px-4 py-2 text-[10px] lg:text-[10.5px] xl:text-[11px] font-semibold tracking-[0.06em] lg:tracking-[0.07em] xl:tracking-[0.1em] transition-all duration-200 whitespace-nowrap truncate",
+                  isActive
+                    ? "text-[#0d9668] dark:text-[#14F195]"
+                    : "text-[#5C5B6B] hover:text-foreground"
+                )}
+                style={{ fontFamily: "var(--font-mono)" }}
+              >
+                {t(item.key).toUpperCase()}
+                {isActive && (
+                  <>
+                    {/* Active dot */}
+                    <span
+                      className="absolute top-1.5 right-1 lg:right-1.5 xl:right-2 h-1 w-1 rounded-full"
+                      style={{
+                        background: "var(--sol-green-hex)",
+                        boxShadow: "0 0 5px color-mix(in srgb, var(--sol-green-hex) 80%, transparent)",
+                      }}
+                    />
+                    {/* Active underline */}
+                    <span
+                      className="absolute bottom-0 left-1/2 -translate-x-1/2 h-[1.5px]"
+                      style={{
+                        width: "calc(100% - 16px)",
+                        background: "linear-gradient(90deg, transparent, var(--sol-green-hex), transparent)",
+                      }}
+                    />
+                  </>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
 
-        {/* Right actions */}
-        <div className="flex items-center gap-2">
-          {/* Gamification Stats */}
-          <NavGamification />
+        {/* Spacer — pushes right actions to the end on mobile/tablet when nav is hidden */}
+        <div className="flex-1 lg:hidden" />
 
-          {/* Mobile search */}
+        {/* Right — Actions (never shrinks, overflow hidden as safety net) */}
+        <div className="flex items-center gap-0.5 lg:gap-0.5 xl:gap-1 shrink-0 overflow-hidden">
+          {/* Gamification — only at 2xl (1536px+) when there's genuinely room */}
+          <div className="hidden 2xl:flex shrink-0">
+            <NavGamification />
+          </div>
+
+          {/* Search — visible at lg+ (hidden on tablet to save space) */}
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
-            className="flex md:hidden h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+            className="hidden lg:flex h-8 w-8 items-center justify-center rounded transition-colors hover:bg-muted shrink-0"
             aria-label={tc("search")}
+            style={{ color: "#4A4958" }}
           >
-            <Search className="h-4 w-4" aria-hidden="true" />
+            <Search className="h-3.5 w-3.5" />
           </button>
 
-          {/* Notifications */}
-          <NotificationCenter />
+          {/* Notifications — visible at xl+ only (saves crucial space at lg) */}
+          <div className="hidden xl:flex shrink-0">
+            <NotificationCenter />
+          </div>
 
-          {/* Auth — SignInButton handles both authenticated and unauthenticated states */}
-          <SignInButton />
+          {/* Auth/wallet buttons — visible at lg+ */}
+          <div className="hidden lg:flex items-center gap-0.5 xl:gap-1 shrink-0">
+            <SignInButton />
+            <WalletButton />
+          </div>
 
-          {/* Wallet */}
-          <WalletButton />
+          {/* Language & theme — visible at xl+ */}
+          <div className="hidden xl:flex items-center gap-0.5 shrink-0">
+            <LocaleSwitcher />
+            <ThemeToggle />
+          </div>
+
+          {/* Hamburger button — visible below lg (covers mobile + tablet) */}
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(true)}
+            className="flex lg:hidden h-9 w-9 items-center justify-center rounded-md transition-colors hover:bg-muted shrink-0"
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5 text-foreground/70" />
+          </button>
         </div>
       </div>
+
+      {/* Mobile slide-out menu */}
+      <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+        <SheetContent
+          side="right"
+          className="w-[280px] bg-background/98 dark:bg-[#08080B]/98 border-l border-border/30 p-0"
+          style={{
+            backdropFilter: "blur(24px)",
+            WebkitBackdropFilter: "blur(24px)",
+          }}
+        >
+          <SheetHeader className="px-5 pt-5 pb-4 border-b border-border/20">
+            <SheetTitle className="flex items-center gap-2.5">
+              <AcademyLogo />
+              <span
+                className="text-[13px] font-bold tracking-tight text-foreground"
+                style={{ fontFamily: "var(--font-mono)" }}
+              >
+                Super<span style={{ color: "var(--sol-green-hex)" }}>team</span>
+              </span>
+            </SheetTitle>
+          </SheetHeader>
+
+          <nav className="flex flex-col px-3 py-4 gap-1" aria-label="Mobile navigation">
+            {navItems.map((item) => {
+              const isActive =
+                pathname === item.href || pathname.startsWith(`${item.href}/`);
+              return (
+                <SheetClose asChild key={item.href}>
+                  <Link
+                    href={item.href}
+                    aria-current={isActive ? "page" : undefined}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2.5 rounded-md text-[12px] font-semibold tracking-[0.08em] transition-colors",
+                      isActive
+                        ? "text-[#0d9668] dark:text-[#14F195] bg-[#0d9668]/[0.08] dark:bg-[#14F195]/[0.06]"
+                        : "text-foreground/65 hover:text-foreground hover:bg-muted/50"
+                    )}
+                    style={{ fontFamily: "var(--font-mono)" }}
+                  >
+                    {isActive && (
+                      <span
+                        className="h-1.5 w-1.5 rounded-full shrink-0"
+                        style={{
+                          background: "var(--sol-green-hex)",
+                          boxShadow: "0 0 5px color-mix(in srgb, var(--sol-green-hex) 80%, transparent)",
+                        }}
+                      />
+                    )}
+                    {t(item.key).toUpperCase()}
+                  </Link>
+                </SheetClose>
+              );
+            })}
+          </nav>
+
+          {/* Search inside sheet for mobile/tablet */}
+          <div className="border-t border-border/20 px-4 py-3">
+            <SheetClose asChild>
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setTimeout(() => setSearchOpen(true), 150);
+                }}
+                className="flex w-full items-center gap-3 px-3 py-2.5 rounded-md text-[12px] font-semibold tracking-[0.08em] text-foreground/65 hover:text-foreground hover:bg-muted/50 transition-colors"
+                style={{ fontFamily: "var(--font-mono)" }}
+              >
+                <Search className="h-3.5 w-3.5 shrink-0" />
+                {tc("search").toUpperCase()}
+              </button>
+            </SheetClose>
+          </div>
+
+          <div className="border-t border-border/20 px-4 py-4 space-y-3">
+            <SignInButton />
+            <WalletButton />
+          </div>
+
+          <div className="border-t border-border/20 px-4 py-3 flex items-center gap-2">
+            <LocaleSwitcher />
+            <ThemeToggle />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <CommandPalette open={searchOpen} onOpenChange={setSearchOpen} />
     </header>

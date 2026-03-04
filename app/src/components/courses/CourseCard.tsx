@@ -6,7 +6,7 @@ import { Link } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { BookOpen, Clock, Star, Users, Zap, Heart } from "lucide-react";
+import { BookOpen, Clock, Star, Users, Zap, Heart, Map } from "lucide-react";
 import { difficultyColors } from "@/lib/utils";
 import { useBookmarkStore } from "@/stores/bookmark-store";
 import { motion } from "framer-motion";
@@ -25,6 +25,7 @@ export interface CourseCardData {
   totalMinutes: number; // sum of estimatedMinutes across all lessons
   averageRating?: number; // optional display-only rating (1-5)
   onChainCourseId?: string; // used to look up live enrollment count
+  trackName?: string; // human-readable track label (REQ-189/405)
 }
 
 /* Difficulty → thumb class, ring colour, icon colour */
@@ -121,7 +122,7 @@ function CourseCardComponent({
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
         >
           <Card
-            className={`group h-full transition-shadow duration-300 hover:shadow-[0_8px_30px_rgba(20,241,149,0.12)] ${cfg.cardClass} border-white/10 bg-card/60 backdrop-blur-sm`}
+            className={`group h-full transition-shadow duration-300 hover:shadow-[0_8px_30px_rgba(20,241,149,0.12)] ${cfg.cardClass} border-border/40 dark:border-white/10 bg-card/60 backdrop-blur-sm`}
           >
             {/* Thumbnail */}
             {course.thumbnail?.asset?.url ? (
@@ -189,7 +190,7 @@ function CourseCardComponent({
             )}
 
             <CardHeader className="space-y-3 pb-2">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   {/* Difficulty badge */}
                   <span
@@ -221,35 +222,43 @@ function CourseCardComponent({
 
               {/* Visual difficulty bar — 3 segments */}
               <div className="flex items-center gap-1 pt-1" aria-label={`Difficulty: ${difficultyLabel}`}>
-                <div className={`h-1 flex-1 rounded-full transition-colors ${course.difficulty >= 1 ? 'bg-green-500' : 'bg-white/10'
+                <div className={`h-1 flex-1 rounded-full transition-colors ${course.difficulty >= 1 ? 'bg-green-500' : 'bg-muted/30 dark:bg-white/10'
                   }`} />
-                <div className={`h-1 flex-1 rounded-full transition-colors ${course.difficulty >= 2 ? 'bg-amber-500' : 'bg-white/10'
+                <div className={`h-1 flex-1 rounded-full transition-colors ${course.difficulty >= 2 ? 'bg-amber-500' : 'bg-muted/30 dark:bg-white/10'
                   }`} />
-                <div className={`h-1 flex-1 rounded-full transition-colors ${course.difficulty >= 3 ? 'bg-red-500' : 'bg-white/10'
+                <div className={`h-1 flex-1 rounded-full transition-colors ${course.difficulty >= 3 ? 'bg-red-500' : 'bg-muted/30 dark:bg-white/10'
                   }`} />
               </div>
             </CardHeader>
 
             <CardContent className="pt-1">
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">
-                  <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
+                  <BookOpen className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   {course.lessonCount} {t("card.lessons")}
                 </span>
 
                 {/* XP — highlighted chip */}
                 <span className="xp-glow-chip">
-                  <Zap className="h-3.5 w-3.5" aria-hidden="true" />
+                  <Zap className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   {totalXp} XP
                 </span>
 
                 {course.totalEnrollments > 0 && (
                   <span className="flex items-center gap-1 ml-auto">
-                    <Users className="h-3.5 w-3.5" aria-hidden="true" />
+                    <Users className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {course.totalEnrollments}
                   </span>
                 )}
               </div>
+
+              {/* Track name (REQ-189/405) */}
+              {course.trackName && (
+                <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                  <Map className="h-3 w-3 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{course.trackName}</span>
+                </div>
+              )}
             </CardContent>
 
             {course.progress !== null && (

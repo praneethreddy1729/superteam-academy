@@ -56,6 +56,10 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
           api_host: POSTHOG_HOST,
           capture_pageview: false,
           persistence: "localStorage",
+          session_recording: {
+            maskAllInputs: true,
+            maskInputOptions: { password: true },
+          },
         });
       }
     });

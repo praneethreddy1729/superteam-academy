@@ -1,9 +1,10 @@
 "use client";
 
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useWalletModal } from "@/components/wallet/CustomWalletModalProvider";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Wallet, LogOut, Copy, Check, User, Settings } from "lucide-react";
 import {
   DropdownMenu,
@@ -15,6 +16,10 @@ import {
 import { useState, useEffect, useRef } from "react";
 import { Link } from "@/i18n/routing";
 import { trackWalletConnect } from "@/lib/analytics/events";
+import { SOLANA_NETWORK } from "@/lib/solana/constants";
+import { useWalletAutoSignIn } from "@/hooks/useWalletAutoSignIn";
+
+const IS_DEVNET = SOLANA_NETWORK === "devnet";
 
 export function WalletButton() {
   const t = useTranslations("common");
@@ -23,6 +28,9 @@ export function WalletButton() {
   const [copied, setCopied] = useState(false);
   const prevConnected = useRef(false);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Bridge wallet connection ↔ NextAuth session
+  useWalletAutoSignIn();
 
   useEffect(() => {
     if (connected && !prevConnected.current && wallet) {
@@ -57,6 +65,16 @@ export function WalletButton() {
   };
 
   return (
+    <div className="flex items-center gap-1.5">
+      {IS_DEVNET && (
+        <Badge
+          variant="outline"
+          className="hidden sm:flex h-6 border-yellow-500/50 bg-yellow-500/10 text-yellow-400 text-[10px] font-semibold uppercase tracking-wider px-1.5"
+          aria-label={t("devnetBadge")}
+        >
+          {t("devnetBadge")}
+        </Badge>
+      )}
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" className="gap-2 border-primary/50" aria-label={`${t("walletOptions")} ${address.slice(0, 4)}...${address.slice(-4)}`}>
@@ -89,9 +107,10 @@ export function WalletButton() {
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => disconnect()}>
           <LogOut className="mr-2 h-4 w-4" aria-hidden="true" />
-          {t("disconnect")}
+          {t("signOut")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    </div>
   );
 }

@@ -20,9 +20,12 @@ import { createClient } from "@sanity/client";
 
 const projectId = process.env.NEXT_PUBLIC_SANITY_PROJECT_ID ?? "vc90yp9o";
 const dataset = process.env.NEXT_PUBLIC_SANITY_DATASET ?? "production";
-const token =
-  process.env.SANITY_API_TOKEN ??
-  "skOyUu38r3j0oXDy6XDgRMJ9NsQWpcbUZBiYLgLvkZgqoTqEgyAmD3YqLNCFfev3g8A4mqgZn59hXbJxvKHKr8xTjBUG6yl4D6dB2LkgEkwEdD5jjsTiQp687KjB4XAjJQS1MVNvayBtpPcdqBH6iHVdpltbx0UfkLo9MjVTX2BmAeGQGqFl";
+const token = process.env.SANITY_API_TOKEN;
+if (!token) {
+  console.error("Error: SANITY_API_TOKEN environment variable is required.");
+  console.error("Set it in your .env.local file or export it before running this script.");
+  process.exit(1);
+}
 
 const client = createClient({
   projectId,

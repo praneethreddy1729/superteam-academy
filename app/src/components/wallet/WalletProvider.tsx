@@ -5,7 +5,7 @@ import {
   ConnectionProvider,
   WalletProvider as SolanaWalletProvider,
 } from "@solana/wallet-adapter-react";
-import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
+import { CustomWalletModalProvider } from "./CustomWalletModalProvider";
 import {
   CoinbaseWalletAdapter,
   LedgerWalletAdapter,
@@ -34,8 +34,8 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   return (
     <ConnectionProvider endpoint={SOLANA_RPC_URL}>
-      <SolanaWalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>{children}</WalletModalProvider>
+      <SolanaWalletProvider wallets={wallets}>
+        <CustomWalletModalProvider>{children}</CustomWalletModalProvider>
       </SolanaWalletProvider>
     </ConnectionProvider>
   );

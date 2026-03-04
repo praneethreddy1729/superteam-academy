@@ -6,6 +6,7 @@ export const challengeSchema = {
   type: "document",
   fields: [
     { name: "title", title: "Title", type: "string", validation: (Rule: Rule) => Rule.required() },
+    { name: "description", title: "Description / Objectives", type: "text", rows: 3, description: "What the learner needs to accomplish. Shown above the code editor." },
     { name: "language", title: "Language", type: "string", options: { list: ["ts", "rust", "json"] } },
     { name: "starterCode", title: "Starter Code", type: "text" },
     { name: "solutionCode", title: "Solution Code", type: "text" },

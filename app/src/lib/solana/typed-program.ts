@@ -48,6 +48,7 @@ interface MethodBuilder {
 
 export interface TypedMethods {
   enroll(courseId: string): MethodBuilder;
+  closeEnrollment(): MethodBuilder;
   completeLesson(lessonIndex: number): MethodBuilder;
   finalizeCourse(): MethodBuilder;
   awardAchievement(): MethodBuilder;

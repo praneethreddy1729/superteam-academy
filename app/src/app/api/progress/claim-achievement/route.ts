@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
       throw new ApiError(ApiErrorCode.UNAUTHORIZED, "Unauthorized");
     }
 
+    // Parse body early so we can verify wallet binding
     let body: unknown;
     try {
       body = await request.json();
@@ -43,6 +44,14 @@ export async function POST(request: NextRequest) {
 
     if (!learner || typeof learner !== "string") {
       throw new ApiError(ApiErrorCode.INVALID_INPUT, "Invalid or missing learner address");
+    }
+
+    // Verify session identity matches the learner wallet
+    const sessionWallet = session.user?.walletAddress;
+    const linkedWallet = request.cookies.get("academy_linked_wallet")?.value;
+    const userWallet = sessionWallet || linkedWallet;
+    if (!userWallet || userWallet !== learner) {
+      throw new ApiError(ApiErrorCode.FORBIDDEN, "Wallet does not match authenticated session");
     }
 
     if (!walletSignature || typeof walletSignature !== "string") {

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useTheme } from "next-themes";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useWalletModal } from "@/components/wallet/CustomWalletModalProvider";
 import { signIn, signOut, useSession } from "next-auth/react";
 import {
   Card,
@@ -20,17 +20,60 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { LocaleSwitcher } from "@/components/layout/LocaleSwitcher";
-import { Moon, Sun, Monitor, Download, Wallet, User, ShieldCheck } from "lucide-react";
+import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
+import { Moon, Sun, Monitor, Download, Wallet, User, ShieldCheck, Link, Upload } from "lucide-react";
 import { GoogleIcon } from "@/components/icons/GoogleIcon";
 import { GitHubIcon } from "@/components/icons/GitHubIcon";
 import { useProgressStore } from "@/stores/progress-store";
 import { useActivityStore } from "@/stores/activity-store";
 import { toast } from "sonner";
 import { truncateAddress } from "@/lib/utils";
+import bs58 from "bs58";
+
+function useLinkedWallet() {
+  const [linkedWallet, setLinkedWallet] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const refetch = async () => {
+    try {
+      const res = await fetch("/api/auth/link-status");
+      if (res.ok) {
+        const data = await res.json();
+        setLinkedWallet(data.linkedWallet ?? null);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refetch();
+  }, []);
+
+  return { linkedWallet, loading, refetch };
+}
 
 const NOTIF_KEY = "academy:notifications";
 const PROFILE_VISIBILITY_KEY = "academy:profile-public";
+const EMAIL_KEYS = {
+  updated: "superteam-email-updated",
+  notification: "superteam-email-notification",
+} as const;
 
 const PROFILE_KEYS = {
   name: "superteam-profile-name",
@@ -59,7 +102,7 @@ export function Settings() {
   const t = useTranslations("settings");
   const tc = useTranslations("common");
   const { theme, setTheme } = useTheme();
-  const { publicKey, connected, disconnect } = useWallet();
+  const { publicKey, connected, disconnect, signMessage } = useWallet();
   const { setVisible: setWalletModalVisible } = useWalletModal();
   const { data: session } = useSession();
   const { completedLessons, streakFreezeCount, streakFreezeUsedDates } = useProgressStore();
@@ -67,6 +110,8 @@ export function Settings() {
 
   const [notifications, setNotifications] = useState({ email: false, push: false });
   const [isProfilePublic, setIsProfilePublic] = useState(true);
+  const [linkingWallet, setLinkingWallet] = useState(false);
+  const { linkedWallet, refetch: refetchLinkedWallet } = useLinkedWallet();
 
   // Profile fields
   const [profileName, setProfileName] = useState("");
@@ -74,6 +119,12 @@ export function Settings() {
   const [profileAvatar, setProfileAvatar] = useState("");
   const [profileTwitter, setProfileTwitter] = useState("");
   const [profileGithub, setProfileGithub] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Email management
+  const [updatedEmail, setUpdatedEmail] = useState("");
+  const [notificationEmail, setNotificationEmail] = useState("");
+  const [emailSaved, setEmailSaved] = useState(false);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -85,6 +136,8 @@ export function Settings() {
     setProfileAvatar(loadProfileField(PROFILE_KEYS.avatar));
     setProfileTwitter(loadProfileField(PROFILE_KEYS.twitter));
     setProfileGithub(loadProfileField(PROFILE_KEYS.github));
+    setUpdatedEmail(loadProfileField(EMAIL_KEYS.updated));
+    setNotificationEmail(loadProfileField(EMAIL_KEYS.notification));
   }, []);
 
   const saveProfile = () => {
@@ -96,7 +149,30 @@ export function Settings() {
       localStorage.setItem(PROFILE_KEYS.github, profileGithub.trim());
       toast.success(t("profile.saved"));
     } catch {
-      toast.error(t("profile.saveFailed") ?? "Failed to save profile");
+      toast.error(t("profile.saveFailed"));
+    }
+  };
+
+  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const dataUrl = evt.target?.result as string;
+      setProfileAvatar(dataUrl);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const saveEmails = () => {
+    try {
+      localStorage.setItem(EMAIL_KEYS.updated, updatedEmail.trim());
+      localStorage.setItem(EMAIL_KEYS.notification, notificationEmail.trim());
+      setEmailSaved(true);
+      setTimeout(() => setEmailSaved(false), 2000);
+      toast.success(t("email.saved"));
+    } catch {
+      toast.error(t("email.saveFailed"));
     }
   };
 
@@ -133,6 +209,47 @@ export function Settings() {
     toast.success(tc("progressExported"));
   };
 
+  const isSocialSession = !!session?.user && !session.user.walletAddress;
+
+  const handleLinkWallet = async () => {
+    if (!connected || !publicKey || !signMessage) {
+      setWalletModalVisible(true);
+      return;
+    }
+
+    setLinkingWallet(true);
+    try {
+      const timestamp = Date.now();
+      const message = `superteam-academy:link-wallet:${timestamp}`;
+      const msgBytes = new TextEncoder().encode(message);
+      const sigBytes = await signMessage(msgBytes);
+      const signature = bs58.encode(sigBytes);
+
+      const res = await fetch("/api/auth/link-wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          walletAddress: publicKey.toBase58(),
+          signature,
+          message,
+          timestamp,
+        }),
+      });
+
+      if (res.ok) {
+        await refetchLinkedWallet();
+        toast.success(t("accounts.walletLinked"));
+      } else {
+        const data = await res.json();
+        toast.error(data.error ?? t("accounts.walletLinkFailed"));
+      }
+    } catch {
+      toast.error(t("accounts.walletLinkFailed"));
+    } finally {
+      setLinkingWallet(false);
+    }
+  };
+
   // Determine which OAuth provider was used from the session image URL (Google vs GitHub)
   // next-auth JWT doesn't expose provider name directly, but image URL differs
   const isGoogleUser = session?.user?.image?.includes("googleusercontent.com") ?? false;
@@ -147,6 +264,13 @@ export function Settings() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
+      <Breadcrumbs
+        ariaLabel={tc("breadcrumb")}
+        items={[
+          { label: tc("home"), href: "/" },
+          { label: tc("settings") },
+        ]}
+      />
       <h1 className="mb-8 text-3xl font-bold">{t("title")}</h1>
       <div className="space-y-6">
         {/* Profile */}
@@ -180,14 +304,42 @@ export function Settings() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="profile-avatar">{t("profile.avatarUrl")}</Label>
-              <Input
-                id="profile-avatar"
-                type="url"
-                value={profileAvatar}
-                onChange={(e) => setProfileAvatar(e.target.value)}
-                placeholder="https://example.com/avatar.png"
-              />
+              <Label>{t("profile.avatar")}</Label>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <Avatar className="h-16 w-16 shrink-0">
+                  <AvatarImage src={profileAvatar || undefined} alt={profileName || "avatar"} />
+                  <AvatarFallback>
+                    <User className="h-7 w-7" aria-hidden="true" />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 space-y-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarFileChange}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                    {t("profile.uploadAvatar")}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">{t("profile.avatarUrlFallback")}</p>
+                  <Input
+                    id="profile-avatar"
+                    type="url"
+                    value={profileAvatar.startsWith("data:") ? "" : profileAvatar}
+                    onChange={(e) => setProfileAvatar(e.target.value)}
+                    placeholder="https://example.com/avatar.png"
+                  />
+                </div>
+              </div>
             </div>
             <Separator />
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -211,7 +363,7 @@ export function Settings() {
             <div className="space-y-1.5">
               <Label htmlFor="profile-github">{t("profile.github")}</Label>
               <div className="flex items-center">
-                <span className="flex h-9 items-center rounded-l-md border border-r-0 border-input bg-muted px-3 text-sm text-muted-foreground">
+                <span className="flex h-9 items-center rounded-l-md border border-r-0 border-input bg-muted px-2 sm:px-3 text-xs sm:text-sm text-muted-foreground shrink-0">
                   github.com/
                 </span>
                 <Input
@@ -225,6 +377,48 @@ export function Settings() {
             </div>
             <Button onClick={saveProfile} className="mt-2">
               {t("profile.saveButton")}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Email */}
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("email.title")}</CardTitle>
+            <CardDescription>{t("email.description")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>{t("email.primary")}</Label>
+              <p className="text-sm text-muted-foreground">
+                {session?.user?.email ?? t("email.notSignedIn")}
+              </p>
+              <p className="text-xs text-muted-foreground">{t("email.primaryNote")}</p>
+            </div>
+            <Separator />
+            <div className="space-y-1.5">
+              <Label htmlFor="email-updated">{t("email.updateLabel")}</Label>
+              <Input
+                id="email-updated"
+                type="email"
+                value={updatedEmail}
+                onChange={(e) => setUpdatedEmail(e.target.value)}
+                placeholder={t("email.updatePlaceholder")}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="email-notification">{t("email.notificationLabel")}</Label>
+              <Input
+                id="email-notification"
+                type="email"
+                value={notificationEmail}
+                onChange={(e) => setNotificationEmail(e.target.value)}
+                placeholder={t("email.notificationPlaceholder")}
+              />
+              <p className="text-xs text-muted-foreground">{t("email.notificationNote")}</p>
+            </div>
+            <Button onClick={saveEmails} size="sm">
+              {emailSaved ? t("email.saved") : t("email.saveButton")}
             </Button>
           </CardContent>
         </Card>
@@ -278,15 +472,15 @@ export function Settings() {
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Google */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
                   <GoogleIcon />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-medium">{t("accounts.google")}</p>
                   {googleConnected && session?.user?.email && (
-                    <p className="text-xs text-muted-foreground">{session.user.email}</p>
+                    <p className="text-xs text-muted-foreground truncate">{session.user.email}</p>
                   )}
                   <Badge
                     variant={googleConnected ? "secondary" : "outline"}
@@ -297,16 +491,34 @@ export function Settings() {
                 </div>
               </div>
               {googleConnected ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    signOut({ redirect: false });
-                    toast.success(t("accounts.unlinkSuccess", { provider: t("accounts.google") }));
-                  }}
-                >
-                  {t("accounts.unlink")}
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      {t("accounts.signOut")}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        {t("accounts.signOutConfirmTitle")}
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {t("accounts.signOutConfirmDescription", { provider: t("accounts.google") })}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>{t("accounts.confirmCancel")}</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => {
+                          signOut({ redirect: false });
+                          toast.success(t("accounts.unlinkSuccess", { provider: t("accounts.google") }));
+                        }}
+                      >
+                        {t("accounts.confirmSignOut")}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               ) : (
                 <Button
                   variant="outline"
@@ -321,15 +533,15 @@ export function Settings() {
             <Separator />
 
             {/* GitHub */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
                   <GitHubIcon />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-medium">{t("accounts.github")}</p>
                   {githubConnected && session?.user?.email && (
-                    <p className="text-xs text-muted-foreground">{session.user.email}</p>
+                    <p className="text-xs text-muted-foreground truncate">{session.user.email}</p>
                   )}
                   <Badge
                     variant={githubConnected ? "secondary" : "outline"}
@@ -340,16 +552,34 @@ export function Settings() {
                 </div>
               </div>
               {githubConnected ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    signOut({ redirect: false });
-                    toast.success(t("accounts.unlinkSuccess", { provider: t("accounts.github") }));
-                  }}
-                >
-                  {t("accounts.unlink")}
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      {t("accounts.signOut")}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        {t("accounts.signOutConfirmTitle")}
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {t("accounts.signOutConfirmDescription", { provider: t("accounts.github") })}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>{t("accounts.confirmCancel")}</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => {
+                          signOut({ redirect: false });
+                          toast.success(t("accounts.unlinkSuccess", { provider: t("accounts.github") }));
+                        }}
+                      >
+                        {t("accounts.confirmSignOut")}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               ) : (
                 <Button
                   variant="outline"
@@ -364,46 +594,91 @@ export function Settings() {
             <Separator />
 
             {/* Wallet */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
                   <Wallet className="h-4 w-4 text-primary" aria-hidden="true" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-medium">{t("accounts.wallet")}</p>
                   {walletConnected && (
-                    <p className="font-mono text-xs text-muted-foreground">
+                    <p className="font-mono text-xs text-muted-foreground truncate">
                       {truncateAddress(publicKey.toBase58(), 8)}
                     </p>
                   )}
+                  {linkedWallet && !walletConnected && (
+                    <p className="font-mono text-xs text-muted-foreground truncate">
+                      {truncateAddress(linkedWallet, 8)}
+                    </p>
+                  )}
                   <Badge
-                    variant={walletConnected ? "secondary" : "outline"}
+                    variant={walletConnected || linkedWallet ? "secondary" : "outline"}
                     className="mt-0.5 text-xs"
                   >
-                    {walletConnected ? t("accounts.connected") : t("accounts.notConnected")}
+                    {walletConnected
+                      ? t("accounts.connected")
+                      : linkedWallet
+                        ? t("accounts.linked")
+                        : t("accounts.notConnected")}
                   </Badge>
                 </div>
               </div>
-              {walletConnected ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    disconnect();
-                    toast.success(t("accounts.walletDisconnected"));
-                  }}
-                >
-                  {t("accounts.unlink")}
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setWalletModalVisible(true)}
-                >
-                  {t("accounts.link")}
-                </Button>
-              )}
+              <div className="flex flex-wrap gap-2">
+                {isSocialSession && !linkedWallet && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLinkWallet}
+                    disabled={linkingWallet}
+                    className="gap-1.5"
+                  >
+                    <Link className="h-3.5 w-3.5" aria-hidden="true" />
+                    {linkingWallet
+                      ? t("accounts.linking")
+                      : connected
+                        ? t("accounts.linkWallet")
+                        : t("accounts.connectAndLink")}
+                  </Button>
+                )}
+                {walletConnected ? (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        {t("accounts.unlink")}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          {t("accounts.disconnectWalletTitle")}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {t("accounts.disconnectWalletDescription")}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>{t("accounts.confirmCancel")}</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => {
+                            disconnect();
+                            toast.success(t("accounts.walletDisconnected"));
+                          }}
+                        >
+                          {t("accounts.confirmDisconnect")}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                ) : !isSocialSession || linkedWallet ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setWalletModalVisible(true)}
+                  >
+                    {t("accounts.link")}
+                  </Button>
+                ) : null}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -446,8 +721,8 @@ export function Settings() {
             <CardDescription>{t("privacy.description")}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
                 <Label htmlFor="profile-public" className="cursor-pointer font-medium">
                   {isProfilePublic ? t("privacy.public") : t("privacy.private")}
                 </Label>
@@ -469,17 +744,17 @@ export function Settings() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-blue-500" aria-hidden="true" />
+              <ShieldCheck className="h-5 w-5 text-blue-600 dark:text-blue-500" aria-hidden="true" />
               {t("streakFreeze.title")}
             </CardTitle>
             <CardDescription>{t("streakFreeze.description")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/10">
-                <ShieldCheck className="h-6 w-6 text-blue-500" aria-hidden="true" />
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-500/10">
+                <ShieldCheck className="h-6 w-6 text-blue-600 dark:text-blue-500" aria-hidden="true" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-lg font-bold">
                   {t("streakFreeze.freezesRemaining", { count: streakFreezeCount })}
                 </p>

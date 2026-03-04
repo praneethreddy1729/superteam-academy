@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PublicKey } from "@solana/web3.js";
+import { auth } from "@/lib/auth/config";
 import { getCredentialsByOwner } from "@/lib/solana/helius";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { ApiError, ApiErrorCode, apiErrorResponse, handleApiError } from "@/lib/api/errors";
@@ -8,6 +9,11 @@ const PRIVATE_CACHE = "private, max-age=30";
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      throw new ApiError(ApiErrorCode.UNAUTHORIZED, "Unauthorized");
+    }
+
     const ip =
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
 
@@ -47,6 +53,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      throw new ApiError(ApiErrorCode.UNAUTHORIZED, "Unauthorized");
+    }
+
     const ip =
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
 

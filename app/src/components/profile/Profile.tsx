@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useTranslations, useLocale } from "next-intl";
 import { useSession } from "next-auth/react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useWalletModal } from "@/components/wallet/CustomWalletModalProvider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,6 +28,7 @@ import { SOLANA_NETWORK } from "@/lib/solana/constants";
 import { Link } from "@/i18n/routing";
 import { SkillRadarChart } from "@/components/profile/SkillRadarChart";
 import { getCourseTrackMap, type CourseTrackInfo } from "@/lib/sanity/queries";
+import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import type { HeliusAsset } from "@/lib/solana/helius";
 
 const PROFILE_VISIBILITY_KEY = "academy:profile-public";
@@ -53,9 +54,29 @@ function BadgeCard({ cred }: { cred: HeliusAsset }) {
   const name = cred.content.metadata.name;
   const imageUrl = cred.content?.json_uri;
 
+  // Extract track and level from Metaplex Core NFT attributes
+  const attributes: { trait_type: string; value: string }[] =
+    cred.content?.metadata?.attributes ?? [];
+  const track = attributes.find((a) => a.trait_type === "track")?.value ?? null;
+  const level = attributes.find((a) => a.trait_type === "level")?.value ?? null;
+
+  const explorerUrl = `https://explorer.solana.com/address/${cred.id}?cluster=${SOLANA_NETWORK}`;
+
   return (
-    <Link href={`/certificates/${cred.id}` as string}>
-      <div className="group flex flex-col items-center gap-3 rounded-xl border border-border/50 bg-gradient-to-br from-primary/5 to-secondary/5 p-4 text-center transition-all duration-200 hover:border-primary/40 hover:shadow-lg hover:scale-[1.02]">
+    <div className="group relative flex flex-col items-center gap-3 rounded-xl border border-border/50 bg-gradient-to-br from-primary/5 to-secondary/5 p-4 text-center transition-all duration-200 hover:border-primary/40 hover:shadow-lg hover:scale-[1.02]">
+      {/* Explorer link — top-right corner */}
+      <a
+        href={explorerUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={t("badges.viewOnExplorer")}
+        className="absolute top-3 right-3 z-10 opacity-0 transition-opacity group-hover:opacity-100"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <ExternalLink className="h-3.5 w-3.5 text-muted-foreground hover:text-primary" aria-hidden="true" />
+      </a>
+
+      <Link href={`/certificates/${cred.id}` as string} className="flex flex-col items-center gap-3 w-full">
         {imageUrl ? (
           <Image
             src={imageUrl}
@@ -77,13 +98,24 @@ function BadgeCard({ cred }: { cred: HeliusAsset }) {
           <p className="text-xs text-muted-foreground font-mono mt-0.5">
             {truncateAddress(cred.id, 5)}
           </p>
-          <Badge variant="outline" className="mt-2 text-xs">
-            {t("badges.minted")}
-          </Badge>
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
+            {track && (
+              <Badge variant="secondary" className="text-xs">
+                {track}
+              </Badge>
+            )}
+            {level && (
+              <Badge variant="outline" className="text-xs border-primary/40 text-primary">
+                {t("badges.level")} {level}
+              </Badge>
+            )}
+            <Badge variant="outline" className="text-xs">
+              {t("badges.minted")}
+            </Badge>
+          </div>
         </div>
-        <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
-      </div>
-    </Link>
+      </Link>
+    </div>
   );
 }
 
@@ -263,6 +295,13 @@ export function Profile() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-12 space-y-6">
+      <Breadcrumbs
+        ariaLabel={tc("breadcrumb")}
+        items={[
+          { label: tc("home"), href: "/" },
+          { label: tc("profile") },
+        ]}
+      />
       {/* Private profile indicator */}
       {!isPublic && (
         <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/50 px-4 py-2 text-sm text-muted-foreground">
@@ -352,7 +391,7 @@ export function Profile() {
 
               {/* Level progress bar */}
               {!xpLoading && (
-                <div className="max-w-xs">
+                <div className="max-w-xs w-full mx-auto sm:mx-0">
                   <div className="mb-1 flex justify-between text-xs text-muted-foreground">
                     <span>{tc("level")} {level}</span>
                     <span>{tc("level")} {level + 1}</span>
@@ -590,7 +629,7 @@ export function Profile() {
               </Link>
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {credentials.map((cred) => (
                 <BadgeCard key={cred.id} cred={cred} />
               ))}

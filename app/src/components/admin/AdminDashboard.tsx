@@ -26,6 +26,18 @@ import { formatXp } from "@/lib/utils";
 import type { CourseAccount } from "@/types/program";
 import type { PublicKey } from "@solana/web3.js";
 
+// ── Admin whitelist (client-side defence-in-depth) ────────────────────────────
+
+function getAllowedWalletsClient(): Set<string> {
+  const raw = process.env.NEXT_PUBLIC_ADMIN_WALLETS ?? "";
+  return new Set(
+    raw
+      .split(",")
+      .map((w) => w.trim())
+      .filter(Boolean)
+  );
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface OnChainCourse {
@@ -216,7 +228,14 @@ export function AdminDashboard() {
     };
   }, [connected]);
 
-  // ── Auth gate ──────────────────────────────────────────────────────────────
+  // ── Auth + authorization gate ──────────────────────────────────────────────
+
+  const allowedWallets = getAllowedWalletsClient();
+  const walletAddress = (session?.user as { walletAddress?: string } | undefined)
+    ?.walletAddress;
+  const isAuthorized =
+    allowedWallets.size === 0 ||
+    (!!walletAddress && allowedWallets.has(walletAddress));
 
   if (sessionStatus === "loading") {
     return (
@@ -240,6 +259,23 @@ export function AdminDashboard() {
           action={
             <Link href="/auth/signin">
               <Button>{t("signInRequired.cta")}</Button>
+            </Link>
+          }
+        />
+      </div>
+    );
+  }
+
+  if (!isAuthorized) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-20">
+        <EmptyState
+          icon={ShieldAlert}
+          title={t("unauthorized.title")}
+          description={t("unauthorized.description")}
+          action={
+            <Link href="/">
+              <Button variant="outline">{t("unauthorized.cta")}</Button>
             </Link>
           }
         />

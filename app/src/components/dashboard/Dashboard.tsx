@@ -1,17 +1,17 @@
 "use client";
 
-import { useState, useEffect, useSyncExternalStore } from "react";
+import { useState, useEffect, useSyncExternalStore, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useWalletModal } from "@/components/wallet/CustomWalletModalProvider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "@/i18n/routing";
-import { Trophy, Zap, BookOpen, Flame, Star, CheckCircle2, ChevronRight, Wallet, Award, ChevronDown, Heart, Hash, Sparkles, TrendingUp, ShieldCheck, ClipboardList } from "lucide-react";
+import { Trophy, Zap, BookOpen, Flame, Star, CheckCircle2, ChevronRight, Wallet, Award, ChevronDown, Heart, Hash, Sparkles, TrendingUp, ShieldCheck, ClipboardList, X, Droplets, Radio } from "lucide-react";
 import { AchievementBadges } from "@/components/gamification/AchievementBadges";
 import { useAchievements } from "@/hooks/useAchievements";
 import { cn } from "@/lib/utils";
@@ -23,11 +23,17 @@ import { useActivityStore, type Activity } from "@/stores/activity-store";
 import { useBookmarkStore } from "@/stores/bookmark-store";
 import { StreakCalendar } from "@/components/gamification/StreakCalendar";
 import { ActivityHeatmap } from "@/components/dashboard/ActivityHeatmap";
-import { LevelUpModal, useLevelUp } from "@/components/gamification/LevelUpModal";
 import type { SanityCourse } from "@/lib/sanity/queries";
 import type { TokenHolder } from "@/lib/solana/helius";
 import { motion, Variants } from "framer-motion";
 import { SpotlightCard } from "@/components/shared/SpotlightCard";
+import { SOLANA_NETWORK } from "@/lib/solana/constants";
+import { useOnChainEvents } from "@/hooks/useOnChainEvents";
+import type { AcademyEvent } from "@/lib/solana/events";
+
+const IS_DEVNET = SOLANA_NETWORK === "devnet";
+const FAUCET_URL = "https://faucet.solana.com";
+const DEVNET_BANNER_DISMISSED_KEY = "devnet-faucet-banner-dismissed";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -121,7 +127,7 @@ function RecommendationCard({ course }: { course: SanityCourse }) {
 
 function AchievementSection() {
   const t = useTranslations("achievements");
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const { publicKey } = useWallet();
   const { unlockedBitmap } = useAchievements(publicKey);
 
@@ -170,9 +176,20 @@ export function Dashboard({ courses }: DashboardProps) {
   const { xp, loading: xpLoading } = useXpBalance();
   const { streakDays, completedLessons, streakFreezeCount, streakFreezeActive } = useProgressStore();
   const { activities } = useActivityStore();
-  const { levelUpOpen, oldLevel, newLevel, closeLevelUp } = useLevelUp();
   const { bookmarkedCourses } = useBookmarkStore();
   const [rank, setRank] = useState<number | null>(null);
+  const [liveEvents, setLiveEvents] = useState<AcademyEvent[]>([]);
+
+  const handleOnChainEvent = useCallback((event: AcademyEvent) => {
+    setLiveEvents((prev) => [event, ...prev].slice(0, 10));
+  }, []);
+
+  useOnChainEvents(handleOnChainEvent, ["LessonCompleted", "CourseFinalized", "CredentialIssued"]);
+
+  const [devnetBannerDismissed, setDevnetBannerDismissed] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return !!localStorage.getItem(DEVNET_BANNER_DISMISSED_KEY);
+  });
   const quizCompleted = useSyncExternalStore(
     (cb) => {
       window.addEventListener("storage", cb);
@@ -292,16 +309,13 @@ export function Dashboard({ courses }: DashboardProps) {
   // Saved/bookmarked courses
   const savedCourses = courses.filter((c) => bookmarkedCourses.includes(c.slug));
 
-  // XP ring geometry: r=45 → circumference = 2π×45 ≈ 282.7
-  const RING_CIRC = 282.7;
-  const ringOffset = RING_CIRC - (levelProgress / 100) * RING_CIRC;
   const totalLessonsCompleted = Object.values(completedLessons).reduce((s, set) => s + set.size, 0);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
       {/* ── Welcome banner — RPG player card ── */}
       <div
-        className="relative mb-8 overflow-hidden rounded-3xl border border-white/10 bg-black/60 p-6 banner-noise shadow-2xl backdrop-blur-xl"
+        className="relative mb-8 overflow-hidden rounded-3xl border border-border/40 dark:border-white/10 bg-card/60 dark:bg-black/60 p-6 banner-noise shadow-2xl backdrop-blur-xl"
         aria-label={t("welcome")}
       >
         {/* Animated dot-grid layer */}
@@ -394,56 +408,109 @@ export function Dashboard({ courses }: DashboardProps) {
 
           {/* Right — Circular XP / Level ring */}
           {xpLoading ? (
-            <Skeleton className="h-28 w-28 rounded-full shrink-0" />
+            <Skeleton className="h-32 w-24 rounded-2xl shrink-0" />
           ) : (
-            <div className="flex shrink-0 flex-col items-center gap-1 self-center" aria-label={`${t("level")} ${level}, ${levelProgress}% ${t("levelProgress")}`}>
-              <div className="relative h-28 w-28">
+            <div className="flex shrink-0 flex-col items-center gap-3 self-center" aria-label={`${t("level")} ${level}, ${levelProgress}% ${t("levelProgress")}`}>
+              <div className="relative h-24 w-24">
+                {/* Outer glow for active progress */}
+                {levelProgress > 0 && (
+                  <div className="absolute inset-0 rounded-full bg-[#14F195]/10 dark:bg-[#14F195]/8 blur-md xp-ring-glow" aria-hidden="true" />
+                )}
                 <svg
                   viewBox="0 0 100 100"
-                  className="h-full w-full -rotate-90"
+                  className="relative h-full w-full -rotate-90"
                   aria-hidden="true"
                 >
-                  {/* Gradient definition */}
+                  {/* Gradient definitions */}
                   <defs>
                     <linearGradient id="xp-ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="hsl(160 100% 51%)" />
-                      <stop offset="100%" stopColor="hsl(262 83% 58%)" />
+                      <stop offset="0%" className="[stop-color:#14F195]" />
+                      <stop offset="100%" className="[stop-color:#0d9668]" />
                     </linearGradient>
+                    <filter id="xp-ring-glow-filter">
+                      <feGaussianBlur stdDeviation="2" result="blur" />
+                      <feMerge>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
                   </defs>
                   {/* Track ring */}
                   <circle
-                    cx="50" cy="50" r="45"
+                    cx="50" cy="50" r="42"
                     fill="none"
-                    stroke="hsl(var(--muted))"
-                    strokeWidth="8"
-                    strokeLinecap="round"
+                    className="stroke-muted/50"
+                    strokeWidth="6"
                   />
                   {/* Progress ring */}
                   <circle
-                    cx="50" cy="50" r="45"
+                    cx="50" cy="50" r="42"
                     fill="none"
                     stroke="url(#xp-ring-grad)"
-                    strokeWidth="8"
+                    strokeWidth="6"
                     strokeLinecap="round"
-                    className="xp-ring-progress"
-                    style={{ "--ring-offset": `${ringOffset}` } as React.CSSProperties}
+                    filter={levelProgress > 0 ? "url(#xp-ring-glow-filter)" : undefined}
+                    className={cn("xp-ring-progress", levelProgress > 0 && "xp-ring-shimmer")}
+                    style={{ "--ring-offset": `${263.9 - (levelProgress / 100) * 263.9}` } as React.CSSProperties}
                   />
                 </svg>
                 {/* Centre label */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-2xl font-extrabold leading-none tabular-nums">{level}</span>
-                  <span className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">
+                  <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/70">
                     {t("level")}
                   </span>
+                  <span className="text-3xl font-extrabold leading-none tabular-nums mt-0.5">{level}</span>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {levelProgress}% → {t("level")} {level + 1}
+              {/* Progress info below the circle */}
+              <p className="text-[11px] tabular-nums text-muted-foreground/50">
+                {levelProgress}%
+                <span className="mx-1 text-muted-foreground/30">&rarr;</span>
+                {t("level")} {level + 1}
               </p>
             </div>
           )}
         </div>
       </div>
+
+      {/* ── Devnet faucet banner ── */}
+      {IS_DEVNET && !devnetBannerDismissed && (
+        <div
+          role="alert"
+          className="mb-4 flex flex-col gap-3 rounded-xl border border-yellow-500/25 bg-yellow-500/8 p-4 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-yellow-500/15">
+              <Droplets className="h-4 w-4 text-yellow-400" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="font-semibold text-sm text-amber-700 dark:text-yellow-300">{t("devnetBanner.title")}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{t("devnetBanner.description")}</p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2 pl-12 sm:pl-0">
+            <a
+              href={FAUCET_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-yellow-500/40 bg-yellow-500/15 px-3 text-xs font-medium text-amber-700 dark:text-yellow-300 transition-colors hover:bg-yellow-500/25"
+            >
+              <Droplets className="h-3.5 w-3.5" aria-hidden="true" />
+              {t("devnetBanner.cta")}
+            </a>
+            <button
+              onClick={() => {
+                localStorage.setItem(DEVNET_BANNER_DISMISSED_KEY, "1");
+                setDevnetBannerDismissed(true);
+              }}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              aria-label={t("devnetBanner.dismiss")}
+            >
+              <X className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Onboarding quiz banner ── */}
       {!quizCompleted && (
@@ -458,7 +525,7 @@ export function Dashboard({ courses }: DashboardProps) {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2 pl-13 sm:pl-0">
-            <span className="rounded-full bg-secondary/15 px-2.5 py-0.5 text-xs font-medium text-secondary">
+            <span className="rounded-full bg-secondary/15 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-secondary">
               {tq("banner.xpReward")}
             </span>
             <Link href="/onboarding">
@@ -473,7 +540,7 @@ export function Dashboard({ courses }: DashboardProps) {
 
       <div className="grid gap-5 grid-cols-1 md:grid-cols-2 lg:grid-cols-6">
         {/* Active Courses */}
-        <Card className="col-span-full lg:col-span-4 border-white/8 bg-card/60 backdrop-blur-sm">
+        <Card className="col-span-full lg:col-span-4 border-border/30 dark:border-white/[0.08] bg-card/60 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BookOpen className="h-5 w-5" aria-hidden="true" />
@@ -497,7 +564,7 @@ export function Dashboard({ courses }: DashboardProps) {
                 {activeCourses.map(({ courseId, completedCount, estimatedTotal, nextLessonTitle }) => (
                   <div
                     key={courseId}
-                    className="flex items-center gap-4 rounded-lg border border-border/50 p-4"
+                    className="flex flex-col gap-3 rounded-lg border border-border/50 p-4 sm:flex-row sm:items-center sm:gap-4"
                   >
                     <div className="flex-1 min-w-0">
                       <p className="truncate font-medium text-sm">{formatCourseId(courseId)}</p>
@@ -509,7 +576,7 @@ export function Dashboard({ courses }: DashboardProps) {
                       </div>
                     </div>
                     <Link href={`/courses/${courseId}?resume=true` as string}>
-                      <Button variant="outline" size="sm" className="flex flex-col items-center h-auto py-1.5 px-3">
+                      <Button variant="outline" size="sm" className="flex w-full flex-col items-center h-auto py-1.5 px-3 sm:w-auto">
                         <span>{t("continueLearning")}</span>
                         {nextLessonTitle && (
                           <span className="max-w-[140px] truncate text-[10px] font-normal text-muted-foreground leading-tight">
@@ -526,7 +593,7 @@ export function Dashboard({ courses }: DashboardProps) {
         </Card>
 
         {/* Saved Courses */}
-        <Card className="col-span-full border-white/8 bg-card/60 backdrop-blur-sm">
+        <Card className="col-span-full border-border/30 dark:border-white/[0.08] bg-card/60 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Heart className="h-5 w-5" aria-hidden="true" />
@@ -562,7 +629,7 @@ export function Dashboard({ courses }: DashboardProps) {
         </Card>
 
         {/* Stats */}
-        <Card className="col-span-full md:col-span-1 lg:col-span-2 overflow-hidden border-white/8 bg-card/60 backdrop-blur-sm">
+        <Card className="col-span-full md:col-span-1 lg:col-span-2 overflow-hidden border-border/30 dark:border-white/[0.08] bg-card/60 backdrop-blur-sm">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2">
               <Trophy className="h-5 w-5" aria-hidden="true" />
@@ -697,7 +764,7 @@ export function Dashboard({ courses }: DashboardProps) {
         </Card>
 
         {/* Activity Heatmap */}
-        <Card className="col-span-full lg:col-span-4 border-white/8 bg-card/60 backdrop-blur-sm">
+        <Card className="col-span-full lg:col-span-4 border-border/30 dark:border-white/[0.08] bg-card/60 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Flame className="h-5 w-5" aria-hidden="true" />
@@ -710,7 +777,7 @@ export function Dashboard({ courses }: DashboardProps) {
         </Card>
 
         {/* Streak Calendar (compact, activity-store-based) */}
-        <Card className="col-span-full lg:col-span-2 border-white/8 bg-card/60 backdrop-blur-sm">
+        <Card className="col-span-full lg:col-span-2 border-border/30 dark:border-white/[0.08] bg-card/60 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-sm">
               <Flame className="h-4 w-4" aria-hidden="true" />
@@ -726,7 +793,7 @@ export function Dashboard({ courses }: DashboardProps) {
         <AchievementSection />
 
         {/* Course Recommendations */}
-        <Card className="col-span-full border-white/8 bg-card/60 backdrop-blur-sm">
+        <Card className="col-span-full border-border/30 dark:border-white/[0.08] bg-card/60 backdrop-blur-sm">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
@@ -765,7 +832,7 @@ export function Dashboard({ courses }: DashboardProps) {
         </Card>
 
         {/* Recent Activity */}
-        <Card className="col-span-full border-white/8 bg-card/60 backdrop-blur-sm">
+        <Card className="col-span-full border-border/30 dark:border-white/[0.08] bg-card/60 backdrop-blur-sm">
           <CardHeader>
             <CardTitle>{t("recentActivity.title")}</CardTitle>
           </CardHeader>
@@ -782,13 +849,13 @@ export function Dashboard({ courses }: DashboardProps) {
                 {activities.slice(0, 10).map((activity) => (
                   <div
                     key={activity.id}
-                    className="flex items-center justify-between rounded-lg bg-muted/30 px-4 py-3"
+                    className="flex flex-col gap-2 rounded-lg bg-muted/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <div className="h-2 w-2 shrink-0 rounded-full bg-primary" />
-                      <span className="text-sm">{activityLabel(activity, t)}</span>
+                      <span className="text-sm truncate">{activityLabel(activity, t)}</span>
                     </div>
-                    <div className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
+                    <div className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground pl-5 sm:pl-0">
                       {activity.xpEarned && (
                         <Badge variant="outline">+{activity.xpEarned} XP</Badge>
                       )}
@@ -800,14 +867,61 @@ export function Dashboard({ courses }: DashboardProps) {
             )}
           </CardContent>
         </Card>
+
+        {/* Live On-Chain Events */}
+        <Card className="col-span-full border-border/30 dark:border-white/[0.08] bg-card/60 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Radio className="h-4 w-4 text-primary animate-pulse" aria-hidden="true" />
+              {t("onChainEvents.title")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {liveEvents.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center" aria-live="polite">
+                <p className="text-sm text-muted-foreground">{t("onChainEvents.noEvents")}</p>
+              </div>
+            ) : (
+              <div className="space-y-2" aria-live="polite" aria-label={t("onChainEvents.title")}>
+                {liveEvents.map((event, idx) => {
+                  const label =
+                    event.type === "LessonCompleted"
+                      ? t("onChainEvents.lessonCompleted")
+                      : event.type === "CourseFinalized"
+                        ? t("onChainEvents.courseFinalized")
+                        : t("onChainEvents.credentialIssued");
+                  const xpEarned =
+                    (event.type === "LessonCompleted" || event.type === "CourseFinalized")
+                      ? event.xpEarned
+                      : null;
+                  return (
+                    <div
+                      key={idx}
+                      className="flex flex-col gap-2 rounded-lg bg-primary/5 border border-primary/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden="true" />
+                        <span className="text-sm truncate">{label}</span>
+                        {"courseId" in event && (
+                          <span className="text-xs text-muted-foreground font-mono truncate">
+                            {String(event.courseId).slice(0, 16)}
+                          </span>
+                        )}
+                      </div>
+                      {xpEarned !== null && xpEarned > 0n && (
+                        <Badge variant="outline" className="shrink-0 text-primary border-primary/40 self-start sm:self-auto">
+                          +{xpEarned.toString()} XP
+                        </Badge>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      <LevelUpModal
-        open={levelUpOpen}
-        onClose={closeLevelUp}
-        oldLevel={oldLevel}
-        newLevel={newLevel}
-      />
     </div>
   );
 }

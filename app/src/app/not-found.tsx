@@ -18,7 +18,7 @@ export default function RootNotFound() {
 
           <div className="pt-2">
             <Link
-              href="/en"
+              href="/"
               className="inline-flex h-11 items-center justify-center rounded-lg bg-primary px-8 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
               Go to homepage

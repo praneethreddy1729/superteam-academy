@@ -1,18 +1,20 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import confetti from "canvas-confetti";
 import dynamic from "next/dynamic";
 import { useTheme } from "next-themes";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Play, RotateCcw, Eye, EyeOff, CheckCircle2, XCircle, Loader2,
-  Lightbulb, Terminal, Sparkles, ChevronUp, ChevronDown,
-  Lock, Unlock, ArrowRight, GitCompareArrows, Copy, Check,
+  Lightbulb, Terminal, Sparkles, ChevronDown,
+  Lock, Unlock, GitCompareArrows, Copy, Check,
+  Target, ListChecks,
 } from "lucide-react";
 import type { SanityChallenge } from "@/lib/sanity/queries";
+import { AIHints } from "@/components/challenges/AIHints";
 import { useProgressStore } from "@/stores/progress-store";
 import { useNotificationStore } from "@/stores/notification-store";
 import { showXPToast } from "@/components/gamification/XPToast";
@@ -25,31 +27,34 @@ loader.config({ paths: { vs: "/monaco/vs" } });
 
 const XP_BY_DIFFICULTY: Record<number, number> = { 1: 25, 2: 50, 3: 100 };
 
-const editorLoading = (
-  <div className="relative flex h-[400px] w-full items-center justify-center overflow-hidden rounded-lg bg-muted/50 border border-border/30">
-    <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
-    <div className="flex flex-col items-center gap-3 text-muted-foreground">
-      <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
-      <span className="text-xs font-medium tracking-wide">Initializing editor…</span>
+function EditorLoading() {
+  const t = useTranslations("challenge");
+  return (
+    <div className="relative flex h-[400px] w-full items-center justify-center overflow-hidden rounded-lg bg-muted/50 border border-border/30">
+      <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+      <div className="flex flex-col items-center gap-3 text-muted-foreground">
+        <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
+        <span className="text-xs font-medium tracking-wide">{t("initializingEditor")}</span>
+      </div>
     </div>
-  </div>
-);
+  );
+}
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react").then((m) => m.default), {
   ssr: false,
-  loading: () => editorLoading,
+  loading: () => <EditorLoading />,
 });
 
 const MonacoDiffEditor = dynamic(() => import("@monaco-editor/react").then((m) => m.DiffEditor), {
   ssr: false,
-  loading: () => editorLoading,
+  loading: () => <EditorLoading />,
 });
 
 async function fetchChallengeById(id: string): Promise<SanityChallenge | null> {
   const { publicClient } = await import("@/lib/sanity/client");
   return publicClient.fetch(
     `*[_type == "challenge" && _id == $id][0] {
-      _id, title, language, starterCode, solutionCode, testCode, hints, difficulty, xpReward
+      _id, title, description, language, starterCode, solutionCode, testCode, hints, difficulty, xpReward
     }`,
     { id }
   );
@@ -180,9 +185,13 @@ interface Props {
   challenge?: SanityChallenge;
   challengeId?: string;
   standalone?: boolean;
+  /** When provided, enables the "Mark Lesson Complete" button after all tests pass */
+  onMarkComplete?: () => Promise<void>;
+  /** Whether the lesson is already marked complete (hides the button) */
+  lessonCompleted?: boolean;
 }
 
-export function CodeChallenge({ challenge: challengeProp, challengeId, standalone = false }: Props) {
+export function CodeChallenge({ challenge: challengeProp, challengeId, standalone = false, onMarkComplete, lessonCompleted = false }: Props) {
   const t = useTranslations("challenge");
   const tc = useTranslations("common");
   const { resolvedTheme } = useTheme();
@@ -202,23 +211,36 @@ export function CodeChallenge({ challenge: challengeProp, challengeId, standalon
   // UI state
   const [showSolution, setShowSolution] = useState(false);
   const [revealedHints, setRevealedHints] = useState(0);
-  const [infoCardExpanded, setInfoCardExpanded] = useState(false);
+  const [hintPanelOpen, setHintPanelOpen] = useState(false);
   const [outputExpanded, setOutputExpanded] = useState(true);
+  const [markingComplete, setMarkingComplete] = useState(false);
 
   // Refs & stores
   const xpAwardedRef = useRef(false);
+  const hasFailedRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Diff editor: track edits in a ref to avoid re-renders that reset Monaco cursor/undo
+  const diffCodeRef = useRef<string>("");
+  // Monaco editor + API refs for marker management
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const editorRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const monacoRef = useRef<any>(null);
   const addBonusXp = useProgressStore((s) => s.addBonusXp);
   const recordActivity = useProgressStore((s) => s.recordActivity);
   const addNotification = useNotificationStore((s) => s.addNotification);
   const { trigger: triggerAchievement } = useAchievementTrigger();
 
-  useEffect(() => () => clearTimeout(timerRef.current), []);
+  useEffect(() => () => { clearTimeout(timerRef.current); clearTimeout(saveTimerRef.current); }, []);
 
   useEffect(() => {
     if (challengeProp) {
       setChallenge(challengeProp);
-      setCode(challengeProp.starterCode);
+      const savedCode = typeof window !== "undefined"
+        ? localStorage.getItem(`academy:challenge:${challengeProp._id}:code`)
+        : null;
+      setCode(savedCode ?? challengeProp.starterCode);
       setOutput("");
       setTestResult(null);
       setTestResults([]);
@@ -232,11 +254,28 @@ export function CodeChallenge({ challenge: challengeProp, challengeId, standalon
       .then((data) => {
         if (data) {
           setChallenge(data);
-          setCode(data.starterCode);
+          const savedCode = typeof window !== "undefined"
+            ? localStorage.getItem(`academy:challenge:${data._id}:code`)
+            : null;
+          setCode(savedCode ?? data.starterCode);
         }
       })
       .finally(() => setLoadingChallenge(false));
   }, [challengeId, challengeProp]);
+
+  // REQ-345: debounced localStorage save
+  const handleCodeChange = useCallback((value: string) => {
+    setCode(value);
+    if (!challenge) return;
+    clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      try {
+        localStorage.setItem(`academy:challenge:${challenge._id}:code`, value);
+      } catch {
+        // quota exceeded — silently ignore
+      }
+    }, 1000);
+  }, [challenge]);
 
   const copySolution = useCallback(() => {
     if (!challenge?.solutionCode) return;
@@ -253,8 +292,12 @@ export function CodeChallenge({ challenge: challengeProp, challengeId, standalon
     setOutput(`${t("tests.running")}\n`);
     // Auto-expand output when running
     setOutputExpanded(true);
-    // Auto-hide solution diff when running tests
-    if (showSolution) setShowSolution(false);
+    // Auto-hide solution diff when running tests; sync ref → state first
+    const codeToTest = showSolution ? diffCodeRef.current : code;
+    if (showSolution) {
+      setCode(diffCodeRef.current);
+      setShowSolution(false);
+    }
 
     timerRef.current = setTimeout(() => {
       const msgs: TestMessages = {
@@ -267,12 +310,88 @@ export function CodeChallenge({ challenge: challengeProp, challengeId, standalon
         fail: t("tests.fail"),
       };
       const { passed, output: testOutput, results } = runPatternTests(
-        code, challenge.testCode, challenge.solutionCode, msgs
+        codeToTest, challenge.testCode, challenge.solutionCode, msgs
       );
       setTestResult(passed ? "pass" : "fail");
       setTestResults(results);
       setOutput(testOutput);
       setRunning(false);
+
+      // REQ-114: set/clear Monaco error markers
+      if (monacoRef.current && editorRef.current) {
+        const monacoApi = monacoRef.current;
+        const model = editorRef.current.getModel();
+        if (model) {
+          if (passed) {
+            monacoApi.editor.setModelMarkers(model, "tests", []);
+          } else {
+            const markers: {
+              startLineNumber: number; startColumn: number;
+              endLineNumber: number; endColumn: number;
+              message: string; severity: number;
+            }[] = [];
+
+            // General warning on line 1
+            markers.push({
+              startLineNumber: 1, startColumn: 1,
+              endLineNumber: 1, endColumn: model.getLineMaxColumn(1),
+              message: "Tests failing — check output panel",
+              severity: monacoApi.MarkerSeverity.Warning,
+            });
+
+            // Rust-specific: detect missing semicolons and unmatched braces
+            if (challenge.language === "rust") {
+              const lines = codeToTest.split("\n");
+              let openBraces = 0;
+              lines.forEach((line, idx) => {
+                const lineNum = idx + 1;
+                const trimmed = line.trim();
+                // Detect likely missing semicolons on statement lines
+                if (
+                  trimmed.length > 0 &&
+                  !trimmed.endsWith(";") &&
+                  !trimmed.endsWith("{") &&
+                  !trimmed.endsWith("}") &&
+                  !trimmed.endsWith(",") &&
+                  !trimmed.startsWith("//") &&
+                  !trimmed.startsWith("/*") &&
+                  !trimmed.startsWith("*") &&
+                  !trimmed.startsWith("#") &&
+                  /^(let |const |return |msg!|require!|err!|Ok\(|Err\()/.test(trimmed)
+                ) {
+                  markers.push({
+                    startLineNumber: lineNum, startColumn: 1,
+                    endLineNumber: lineNum, endColumn: line.length + 1,
+                    message: "Possible missing semicolon",
+                    severity: monacoApi.MarkerSeverity.Info,
+                  });
+                }
+                // Track brace balance
+                for (const ch of line) {
+                  if (ch === "{") openBraces++;
+                  else if (ch === "}") openBraces--;
+                }
+              });
+              // Mark last line if braces are unbalanced
+              if (openBraces !== 0) {
+                const lastLine = lines.length;
+                markers.push({
+                  startLineNumber: lastLine, startColumn: 1,
+                  endLineNumber: lastLine, endColumn: model.getLineMaxColumn(lastLine),
+                  message: `Unmatched braces (${openBraces > 0 ? "missing closing }" : "extra closing }"})`,
+                  severity: monacoApi.MarkerSeverity.Error,
+                });
+              }
+            }
+
+            monacoApi.editor.setModelMarkers(model, "tests", markers);
+          }
+        }
+      }
+
+      if (!passed) {
+        hasFailedRef.current = true;
+      }
 
       if (passed && standalone && !xpAwardedRef.current) {
         const xpAmount = challenge.xpReward ?? XP_BY_DIFFICULTY[challenge.difficulty] ?? 25;
@@ -288,20 +407,44 @@ export function CodeChallenge({ challenge: challengeProp, challengeId, standalon
         import("@/lib/analytics/events").then(({ trackChallengeComplete }) => {
           trackChallengeComplete(challenge._id, challenge.difficulty);
         }).catch(() => { });
-        void triggerAchievement("challenge_complete", { isFirstAttempt: true });
+      }
+      if (passed) {
+        confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+        void triggerAchievement("challenge_complete", { isFirstAttempt: !hasFailedRef.current });
       }
     }, 400);
   }, [challenge, code, standalone, showSolution, t, addBonusXp, recordActivity, addNotification, triggerAchievement]);
 
   const reset = useCallback(() => {
     if (!challenge) return;
+    diffCodeRef.current = "";
+    // REQ-345: clear saved code so reset goes back to starterCode
+    try {
+      localStorage.removeItem(`academy:challenge:${challenge._id}:code`);
+    } catch { /* ignore */ }
     setCode(challenge.starterCode);
     setOutput("");
     setTestResult(null);
     setTestResults([]);
     setShowSolution(false);
     setRevealedHints(0);
+    hasFailedRef.current = false;
+    // REQ-114: clear error markers on reset
+    if (monacoRef.current && editorRef.current) {
+      const model = editorRef.current.getModel();
+      if (model) monacoRef.current.editor.setModelMarkers(model, "tests", []);
+    }
   }, [challenge]);
+
+  const handleMarkComplete = useCallback(async () => {
+    if (!onMarkComplete || markingComplete) return;
+    setMarkingComplete(true);
+    try {
+      await onMarkComplete();
+    } finally {
+      setMarkingComplete(false);
+    }
+  }, [onMarkComplete, markingComplete]);
 
   useKeyboardShortcuts([
     {
@@ -342,14 +485,19 @@ export function CodeChallenge({ challenge: challengeProp, challengeId, standalon
   const monacoLang = challenge.language === "ts" ? "typescript" : challenge.language === "json" ? "json" : "rust";
   const totalHints = (challenge.hints ?? []).length;
 
-  const handleEditorDidMount = (editor: unknown, monaco: {
-    languages: {
-      registerCompletionItemProvider: (lang: string, provider: {
-        provideCompletionItems: (model: unknown, position: { lineNumber: number; column: number }) => { suggestions: unknown[] };
-      }) => void;
-      CompletionItemKind: { Keyword: number };
-    };
-  }) => {
+  // Parse // expect: lines from testCode for the pre-run checklist
+  const expectedPatterns = (challenge.testCode ?? "")
+    .split("\n")
+    .filter((l) => l.trim().startsWith("// expect:"))
+    .map((l) => l.replace("// expect:", "").trim())
+    .filter(Boolean);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleEditorDidMount = (editor: any, monaco: any) => {
+    // REQ-114: store refs for marker management
+    editorRef.current = editor;
+    monacoRef.current = monaco;
+
     if (challenge.language === "rust") {
       monaco.languages.registerCompletionItemProvider("rust", {
         provideCompletionItems: (_model: unknown, position: { lineNumber: number; column: number }) => {
@@ -382,7 +530,7 @@ export function CodeChallenge({ challenge: challengeProp, challengeId, standalon
       {/* ── Toolbar ── */}
       <div className="relative shrink-0 border-b border-border/40 bg-background/80 backdrop-blur-sm">
         <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
-        <div className="flex items-center gap-2 px-4 py-2">
+        <div className="flex flex-wrap items-center gap-2 px-3 sm:px-4 py-2">
           {/* Challenge title + badges — compact */}
           <div className="hidden lg:flex items-center gap-2 mr-3 pr-3 border-r border-border/30">
             <span className="text-sm font-semibold truncate max-w-[200px]">{challenge.title}</span>
@@ -407,11 +555,11 @@ export function CodeChallenge({ challenge: challengeProp, challengeId, standalon
           <Button
             onClick={runTests}
             size="sm"
-            className="gap-1.5 shadow-sm group"
+            className="gap-1.5 shadow-sm group shrink-0"
             disabled={running}
           >
             {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-            {running ? "Running…" : t("runTests")}
+            {running ? t("running") : t("runTests")}
             {!running && (
               <kbd className="hidden sm:inline-flex ml-1 h-4 items-center rounded border border-border/50 bg-muted/60 px-1 font-mono text-[9px] text-muted-foreground group-hover:border-primary/30">
                 ⌘↵
@@ -421,7 +569,7 @@ export function CodeChallenge({ challenge: challengeProp, challengeId, standalon
 
           <Button onClick={reset} variant="outline" size="sm" className="gap-1.5">
             <RotateCcw className="h-3.5 w-3.5" />
-            {t("reset")}
+            <span className="hidden sm:inline">{t("reset")}</span>
           </Button>
 
           {/* Solution toggle — switches editor to side-by-side diff view */}
@@ -429,13 +577,21 @@ export function CodeChallenge({ challenge: challengeProp, challengeId, standalon
             variant={showSolution ? "default" : "ghost"}
             size="sm"
             className={`gap-1.5 transition-all ${showSolution ? "bg-primary/15 text-primary border border-primary/30 hover:bg-primary/20" : ""}`}
-            onClick={() => setShowSolution(!showSolution)}
+            onClick={() => {
+              if (!showSolution) {
+                diffCodeRef.current = code;
+                setShowSolution(true);
+              } else {
+                setCode(diffCodeRef.current);
+                setShowSolution(false);
+              }
+            }}
           >
             {showSolution ? (
               <>
                 <EyeOff className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Hide Solution to Edit</span>
-                <span className="sm:hidden">Hide</span>
+                <span className="hidden sm:inline">{t("hideSolutionToEdit")}</span>
+                <span className="sm:hidden">{t("hide")}</span>
               </>
             ) : (
               <>
@@ -445,17 +601,15 @@ export function CodeChallenge({ challenge: challengeProp, challengeId, standalon
             )}
           </Button>
 
-          <div className="flex-1" />
-
           {/* Animated status badge */}
           {testResult === "pass" && (
-            <Badge className="gap-1.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 animate-in fade-in-0 zoom-in-95 duration-300">
+            <Badge className="ml-auto gap-1.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 animate-in fade-in-0 zoom-in-95 duration-300">
               <CheckCircle2 className="h-3.5 w-3.5" />
               {t("allTestsPassed")}
             </Badge>
           )}
           {testResult === "fail" && (
-            <Badge className="gap-1.5 bg-red-500/10 text-red-400 border border-red-500/20 animate-in fade-in-0 slide-in-from-right-2 duration-300">
+            <Badge className="ml-auto gap-1.5 bg-red-500/10 text-red-400 border border-red-500/20 animate-in fade-in-0 slide-in-from-right-2 duration-300">
               <XCircle className="h-3.5 w-3.5" />
               {t("testsFailing")}
             </Badge>
@@ -463,19 +617,76 @@ export function CodeChallenge({ challenge: challengeProp, challengeId, standalon
         </div>
       </div>
 
+      {/* ── Description / Objectives Card ── */}
+      {(challenge.description || expectedPatterns.length > 0) && (
+        <div className="shrink-0 border-b border-border/40 bg-muted/10 px-3 sm:px-4 py-3 space-y-3 min-w-0 overflow-hidden">
+          {/* Description */}
+          {challenge.description && (
+            <div className="flex gap-2.5">
+              <Target className="h-4 w-4 shrink-0 mt-0.5 text-primary" aria-hidden="true" />
+              <div className="space-y-0.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t("objectives")}
+                </p>
+                <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
+                  {challenge.description}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Expected outputs checklist (pre-run) */}
+          {expectedPatterns.length > 0 && (
+            <div className="flex gap-2.5">
+              <ListChecks className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" aria-hidden="true" />
+              <div className="space-y-1.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t("expectedOutputs")}
+                </p>
+                <div className="flex flex-col gap-1">
+                  {expectedPatterns.map((pattern, i) => {
+                    const result = testResults.find((r) => r.pattern === pattern);
+                    const isDone = result?.passed ?? false;
+                    const hasRun = testResults.length > 0;
+                    return (
+                      <div
+                        key={i}
+                        className={`flex items-center gap-2 text-xs font-mono transition-colors duration-300 ${isDone
+                          ? "text-emerald-500"
+                          : hasRun
+                            ? "text-red-400"
+                            : "text-muted-foreground"
+                          }`}
+                      >
+                        {isDone ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                        ) : (
+                          <div className={`h-3.5 w-3.5 shrink-0 rounded-full border ${hasRun ? "border-red-500/50 bg-red-500/10" : "border-border/50"}`} />
+                        )}
+                        <span className="truncate">{pattern}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Editor Area — toggles between normal editor and diff view ── */}
       <div className="flex-1 min-h-[200px] relative">
         {showSolution && (
           <div className="absolute top-2 left-0 right-0 z-10 flex items-center justify-center pointer-events-none animate-in fade-in-0 slide-in-from-top-2 duration-300">
-            <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-primary/20 bg-background/90 backdrop-blur-sm px-4 py-1.5 shadow-lg">
+            <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-2 sm:gap-3 rounded-full border border-primary/20 bg-background/90 backdrop-blur-sm px-3 sm:px-4 py-1.5 shadow-lg max-w-[90vw]">
               <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Eye className="h-3 w-3 text-primary" />
-                Your Code
+                {t("yourCode")}
               </span>
-              <span className="text-[10px] text-muted-foreground/40">←  diff  →</span>
+              <span className="text-[10px] text-muted-foreground/40">←  {t("diff")}  →</span>
               <span className="text-xs font-medium text-emerald-500 flex items-center gap-1.5">
                 <CheckCircle2 className="h-3 w-3" />
-                Solution
+                {t("solution")}
               </span>
               <div className="w-px h-3 bg-border/40" />
               <button
@@ -483,7 +694,7 @@ export function CodeChallenge({ challenge: challengeProp, challengeId, standalon
                 className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
               >
                 {copiedSolution ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-                {copiedSolution ? "Copied!" : "Copy"}
+                {copiedSolution ? t("copied") : t("copy")}
               </button>
             </div>
           </div>
@@ -494,20 +705,26 @@ export function CodeChallenge({ challenge: challengeProp, challengeId, standalon
             height="100%"
             language={monacoLang}
             theme={resolvedTheme === "dark" ? "vs-dark" : "light"}
-            original={code}
+            original={diffCodeRef.current}
             modified={challenge.solutionCode}
+            onMount={(editor) => {
+              const originalModel = editor.getOriginalEditor();
+              // Update ref only — no setCode, so no re-render, cursor/undo preserved
+              originalModel.onDidChangeModelContent(() => {
+                diffCodeRef.current = originalModel.getValue();
+              });
+            }}
             options={{
               fontSize: 14,
               minimap: { enabled: false },
               fontFamily: "var(--font-mono), 'JetBrains Mono', monospace",
               padding: { top: 40, bottom: 16 },
               scrollBeyondLastLine: false,
-              readOnly: true,
               renderSideBySide: true,
-              originalEditable: false,
+              originalEditable: true,
               renderOverviewRuler: false,
               diffWordWrap: "on" as const,
-              ariaLabel: "Solution diff view",
+              ariaLabel: "Solution diff view — left panel is editable",
             }}
           />
         ) : (
@@ -516,7 +733,7 @@ export function CodeChallenge({ challenge: challengeProp, challengeId, standalon
             language={monacoLang}
             theme={resolvedTheme === "dark" ? "vs-dark" : "light"}
             value={code}
-            onChange={(v) => setCode(v ?? "")}
+            onChange={(v) => handleCodeChange(v ?? "")}
             onMount={handleEditorDidMount}
             options={{
               fontSize: 14,
@@ -533,6 +750,32 @@ export function CodeChallenge({ challenge: challengeProp, challengeId, standalon
               parameterHints: { enabled: true },
             }}
           />
+        )}
+
+        {/* ── Floating Hint Pill ── persistent, bottom-right of editor */}
+        {totalHints > 0 && !hintPanelOpen && (
+          <button
+            onClick={() => setHintPanelOpen(true)}
+            className="absolute bottom-3 right-3 z-20 flex items-center gap-2 rounded-full border border-amber-500/30 bg-background/90 backdrop-blur-sm px-3 py-1.5 shadow-lg hover:border-amber-500/60 hover:bg-amber-500/5 transition-all duration-200 group animate-in fade-in-0 slide-in-from-bottom-2 duration-300"
+            aria-label={t("hints.title")}
+          >
+            <Lightbulb className="h-3.5 w-3.5 text-amber-500 group-hover:scale-110 transition-transform" />
+            <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+              {revealedHints > 0
+                ? `${revealedHints}/${totalHints}`
+                : t("hints.hintsAvailable", { count: totalHints })}
+            </span>
+            {revealedHints > 0 && (
+              <div className="flex gap-0.5">
+                {(challenge.hints ?? []).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`h-1 w-2.5 rounded-full transition-colors ${i < revealedHints ? "bg-amber-500" : "bg-border/50"}`}
+                  />
+                ))}
+              </div>
+            )}
+          </button>
         )}
       </div>
 
@@ -569,7 +812,7 @@ export function CodeChallenge({ challenge: challengeProp, challengeId, standalon
             >
               <Terminal className={`h-3 w-3 transition-colors ${testResult === "pass" ? "text-emerald-500" : testResult === "fail" ? "text-red-400" : ""
                 }`} />
-              Output
+              {t("output")}
               {testResult && (
                 <span className={`ml-1 text-[9px] font-mono px-1.5 py-0.5 rounded-full ${testResult === "pass" ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-400"
                   }`}>
@@ -579,8 +822,8 @@ export function CodeChallenge({ challenge: challengeProp, challengeId, standalon
               <ChevronDown className={`h-3 w-3 ml-auto transition-transform duration-200 ${outputExpanded ? "rotate-180" : ""}`} />
             </button>
             {outputExpanded && (
-              <div aria-live="assertive" className="max-h-32 overflow-y-auto px-4 pb-2 bg-background/50">
-                <pre className={`font-mono text-xs leading-relaxed ${testResult === "pass" ? "text-emerald-600 dark:text-emerald-400"
+              <div aria-live="assertive" className="max-h-32 overflow-auto px-4 pb-2 bg-background/50">
+                <pre className={`font-mono text-xs leading-relaxed whitespace-pre-wrap break-words ${testResult === "pass" ? "text-emerald-600 dark:text-emerald-400"
                     : testResult === "fail" ? "text-red-600 dark:text-red-400"
                       : "text-foreground/80"
                   }`}>
@@ -591,99 +834,172 @@ export function CodeChallenge({ challenge: challengeProp, challengeId, standalon
           </div>
         )}
 
-        {/* ── Info Card: Challenge Details + Progressive Hints ── */}
-        <div className="bg-gradient-to-t from-muted/20 to-transparent">
-          <button
-            onClick={() => setInfoCardExpanded(!infoCardExpanded)}
-            className="flex w-full items-center gap-3 px-4 py-2 text-sm hover:bg-muted/20 transition-colors"
-          >
-            {/* Mobile title (hidden on desktop where title is in toolbar) */}
-            <span className="lg:hidden font-semibold truncate">{challenge.title}</span>
-            <span className="hidden lg:inline text-muted-foreground text-xs">Challenge Details</span>
+        {/* ── Mark Lesson Complete ── shown when tests pass and lesson context is available */}
+        {onMarkComplete && testResult === "pass" && !lessonCompleted && (
+          <div className="border-b border-emerald-500/30 bg-emerald-500/5 px-4 py-2.5 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
+              <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
+                {t("testsPassedMarkComplete")}
+              </p>
+              <Button
+                onClick={handleMarkComplete}
+                disabled={markingComplete}
+                size="sm"
+                className="shrink-0 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white border-0"
+                aria-label={t("markComplete")}
+              >
+                {markingComplete ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                )}
+                {markingComplete ? t("markCompleting") : t("markComplete")}
+              </Button>
+            </div>
+          </div>
+        )}
 
-            {/* Mobile badges */}
-            <div className="lg:hidden flex items-center gap-1.5 ml-auto mr-2">
-              <Badge className="text-[9px] font-mono" variant="outline">{challenge.language.toUpperCase()}</Badge>
-              <Badge variant="outline" className="gap-0.5 text-[9px] border-yellow-500/30 text-yellow-500">
-                <Sparkles className="h-2 w-2" />{challenge.xpReward ?? XP_BY_DIFFICULTY[challenge.difficulty] ?? 25}
-              </Badge>
+        {/* Already completed notice */}
+        {onMarkComplete && lessonCompleted && (
+          <div className="border-b border-emerald-500/20 bg-emerald-500/5 px-4 py-2 animate-in fade-in-0 duration-300">
+            <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              {t("allTestsPassed")}
+            </div>
+          </div>
+        )}
+
+        {/* ── Mobile Challenge Info Bar (visible on small screens only) ── */}
+        <div className="lg:hidden border-b border-border/30 bg-muted/10 px-3 py-1.5 flex items-center gap-1.5">
+          <span className="text-xs font-semibold truncate">{challenge.title}</span>
+          <Badge className="text-[9px] font-mono ml-auto" variant="outline">{challenge.language.toUpperCase()}</Badge>
+          <Badge variant="outline" className="gap-0.5 text-[9px] border-yellow-500/30 text-yellow-500">
+            <Sparkles className="h-2 w-2" />{challenge.xpReward ?? XP_BY_DIFFICULTY[challenge.difficulty] ?? 25}
+          </Badge>
+        </div>
+
+        {/* ── Slide-up Hint Panel ── */}
+        {totalHints > 0 && hintPanelOpen && (
+          <div className="border-t border-amber-500/30 bg-gradient-to-t from-amber-500/[0.03] to-transparent animate-in slide-in-from-bottom-4 fade-in-0 duration-300">
+            {/* Panel header */}
+            <div className="flex items-center justify-between px-3 sm:px-4 py-2 border-b border-border/30">
+              <div className="flex items-center gap-2">
+                <Lightbulb className="h-4 w-4 text-amber-500" />
+                <span className="text-sm font-medium">{t("hints.title")}</span>
+                <span className="text-xs text-muted-foreground">({revealedHints}/{totalHints})</span>
+              </div>
+              <button
+                onClick={() => setHintPanelOpen(false)}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors rounded-md px-2 py-1 hover:bg-muted/30"
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
             </div>
 
-            {/* Hint progress indicator */}
-            {totalHints > 0 && (
-              <span className="hidden lg:flex items-center gap-1.5 text-xs text-muted-foreground ml-auto mr-2">
-                <Lightbulb className="h-3 w-3 text-amber-500" />
-                {revealedHints}/{totalHints}
-              </span>
-            )}
-            <ChevronUp className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${infoCardExpanded ? "" : "rotate-180"}`} />
-          </button>
+            {/* Hint progress bar */}
+            <div className="flex gap-1 px-3 sm:px-4 pt-2">
+              {(challenge.hints ?? []).map((_, i) => (
+                <div
+                  key={i}
+                  className={`h-1 flex-1 rounded-full transition-all duration-500 ${i < revealedHints ? "bg-amber-500" : "bg-border/40"}`}
+                />
+              ))}
+            </div>
 
-          {infoCardExpanded && (
-            <div className="px-4 pb-4 space-y-3">
-              {/* ── Progressive Hints ── */}
-              {totalHints > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-2 text-xs font-medium">
-                      <Lightbulb className="h-3.5 w-3.5 text-amber-500" />
-                      {t("hints.title")}
-                      <span className="text-muted-foreground">({revealedHints}/{totalHints})</span>
-                    </span>
-                    {revealedHints < totalHints && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 gap-1.5 text-xs text-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
-                        onClick={() => setRevealedHints((r) => Math.min(r + 1, totalHints))}
-                      >
-                        <Unlock className="h-3 w-3" />
-                        Reveal Hint {revealedHints + 1}
-                        <ArrowRight className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
+            {/* Hint cards — progressive disclosure */}
+            <div className="px-3 sm:px-4 py-3 space-y-2 max-h-[280px] overflow-y-auto">
+              {(challenge.hints ?? []).map((hint, i) => {
+                const isRevealed = i < revealedHints;
+                const isNext = i === revealedHints;
+                const levelLabels = [
+                  t("hints.hintLevel1Label"),
+                  t("hints.hintLevel2Label"),
+                  t("hints.hintLevel3Label"),
+                ];
+                const levelDescs = [
+                  t("hints.hintLevel1Desc"),
+                  t("hints.hintLevel2Desc"),
+                  t("hints.hintLevel3Desc"),
+                ];
+                const levelIcons = [
+                  <Lightbulb key="l" className="h-3.5 w-3.5" />,
+                  <Target key="t" className="h-3.5 w-3.5" />,
+                  <Sparkles key="s" className="h-3.5 w-3.5" />,
+                ];
 
-                  {/* Hint progress bar */}
-                  <div className="flex gap-1">
-                    {(challenge.hints ?? []).map((_, i) => (
-                      <div
-                        key={i}
-                        className={`h-1 flex-1 rounded-full transition-all duration-500 ${i < revealedHints ? "bg-amber-500" : "bg-border/50"
-                          }`}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Revealed hints */}
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    {(challenge.hints ?? []).map((hint, i) => (
-                      <div
-                        key={i}
-                        className={`relative rounded-lg border p-3 text-sm transition-all duration-300 ${i < revealedHints
-                          ? "border-amber-500/20 bg-amber-500/5 opacity-100 translate-y-0"
-                          : "border-border/20 bg-muted/20 opacity-40 pointer-events-none"
-                          }`}
-                      >
-                        <div className="flex gap-2.5">
-                          <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${i < revealedHints
+                return (
+                  <div
+                    key={i}
+                    className={`rounded-lg border p-3 transition-all duration-300 ${
+                      isRevealed
+                        ? "border-amber-500/25 bg-amber-500/[0.06]"
+                        : isNext
+                          ? "border-amber-500/15 bg-muted/20"
+                          : "border-border/20 bg-muted/10 opacity-50"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                        {/* Level badge */}
+                        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full mt-0.5 ${
+                          isRevealed
                             ? "bg-amber-500/15 text-amber-500"
-                            : "bg-border/40 text-muted-foreground"
-                            }`}>
-                            {i < revealedHints ? i + 1 : <Lock className="h-2.5 w-2.5" />}
-                          </span>
-                          <span className={`leading-relaxed ${i < revealedHints ? "text-foreground/90" : "blur-[3px] select-none"}`}>
-                            {i < revealedHints ? hint : "This hint is locked. Click Reveal to unlock."}
-                          </span>
+                            : "bg-border/30 text-muted-foreground"
+                        }`}>
+                          {isRevealed ? levelIcons[i] ?? levelIcons[0] : <Lock className="h-3 w-3" />}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-semibold ${isRevealed ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+                              {levelLabels[i] ?? levelLabels[2]}
+                            </span>
+                            {isRevealed && (
+                              <span className="text-[9px] font-mono uppercase tracking-wider text-amber-500/60">
+                                {t("hints.revealed")}
+                              </span>
+                            )}
+                          </div>
+                          {isRevealed ? (
+                            <p className="text-sm leading-relaxed text-foreground/85 mt-1.5 whitespace-pre-wrap">
+                              {hint}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {levelDescs[i] ?? levelDescs[2]}
+                            </p>
+                          )}
                         </div>
                       </div>
-                    ))}
+
+                      {/* Reveal button — only on the next unrevealed hint */}
+                      {isNext && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0 gap-1.5 text-xs border-amber-500/40 text-amber-600 hover:text-amber-500 hover:border-amber-500 hover:bg-amber-500/10 dark:text-amber-400 dark:hover:text-amber-300"
+                          onClick={() => setRevealedHints((r) => Math.min(r + 1, totalHints))}
+                        >
+                          <Unlock className="h-3 w-3" />
+                          {t("hints.reveal")}
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })}
+
+              {/* AI Hints — nested inside the hint panel */}
+              <AIHints
+                hints={challenge.hints ?? []}
+                language={challenge.language === "json" ? "ts" : challenge.language}
+                difficulty={challenge.difficulty}
+                challengeTitle={challenge.title}
+                starterCode={challenge.starterCode}
+                userCode={code}
+              />
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

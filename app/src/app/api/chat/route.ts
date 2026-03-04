@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { auth } from "@/lib/auth/config";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const SYSTEM_PROMPT = `You are "Academy AI", the Solana learning assistant for Superteam Academy.
 You help developers learn Solana blockchain development. You are friendly, concise, and technically accurate.
@@ -111,13 +113,38 @@ Ask me about any of these topics! 🚀`;
 
 export async function POST(req: NextRequest) {
     try {
+        const session = await auth();
+        if (!session?.user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        // Rate limit: 20 requests per 60 seconds per user
+        const userId = session.user?.id ?? session.user?.email ?? "anonymous";
+        if (!checkRateLimit(`chat:${userId}`, 20, 60_000)) {
+            return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+        }
+
         const { messages } = await req.json();
 
         if (!messages || !Array.isArray(messages) || messages.length === 0) {
             return NextResponse.json({ error: "Messages are required" }, { status: 400 });
         }
 
-        const lastMessage = messages[messages.length - 1]?.content || "";
+        // Sanitize messages: filter roles, cap count, cap content length
+        const validRoles = new Set(["user", "assistant"]);
+        const sanitizedMessages = messages
+            .filter((msg: any) => validRoles.has(msg.role))
+            .slice(-20)
+            .map((msg: any) => ({
+                role: msg.role as "user" | "assistant",
+                content: typeof msg.content === "string" ? msg.content.slice(0, 4000) : "",
+            }));
+
+        if (sanitizedMessages.length === 0) {
+            return NextResponse.json({ error: "Messages are required" }, { status: 400 });
+        }
+
+        const lastMessage = sanitizedMessages[sanitizedMessages.length - 1]?.content || "";
         const apiKey = process.env.ANTHROPIC_API_KEY;
 
         // If no API key, use built-in knowledge base
@@ -130,24 +157,19 @@ export async function POST(req: NextRequest) {
         // Use Anthropic Claude
         const client = new Anthropic({ apiKey });
 
-        const anthropicMessages = messages.map((msg: { role: string; content: string }) => ({
-            role: msg.role as "user" | "assistant",
-            content: msg.content,
-        }));
-
         const response = await client.messages.create({
             model: "claude-sonnet-4-20250514",
             max_tokens: 1024,
             system: SYSTEM_PROMPT,
-            messages: anthropicMessages,
+            messages: sanitizedMessages,
         });
 
         const textContent = response.content.find((block) => block.type === "text");
         const content = textContent && "text" in textContent ? textContent.text : "I couldn't generate a response. Please try again.";
 
         return NextResponse.json({ content });
-    } catch (error) {
-        console.error("[Chat API Error]", error);
+    } catch (error: any) {
+        console.error("[Chat API Error]", { message: error?.message, status: error?.status });
         return NextResponse.json(
             { error: "Failed to process your question. Please try again." },
             { status: 500 }

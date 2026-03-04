@@ -49,3 +49,16 @@ export function trackPageView(path: string): void {
   trackEvent("page_view", { page_path: path });
   getPostHog()?.capture("$pageview", { $current_url: path });
 }
+
+export function trackXpEarned(
+  amount: number,
+  source: "lesson" | "challenge" | "course" | "streak" | "bonus",
+  totalXp: number
+): void {
+  trackEvent("xp_earned", {
+    amount: String(amount),
+    source,
+    total_xp: String(totalXp),
+  });
+  getPostHog()?.capture("xp_earned", { amount, source, total_xp: totalXp });
+}

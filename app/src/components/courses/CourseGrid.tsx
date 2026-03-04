@@ -18,39 +18,46 @@ import { Search, BookOpen, AlertCircle } from "lucide-react";
 import type { SanityCourse } from "@/lib/sanity/queries";
 import { EmptyState } from "@/components/shared/empty-state";
 import { fetchAllCourses } from "@/lib/solana/queries";
+import { useProgressStore } from "@/stores/progress-store";
+import { TRACK_SLUGS, TRACK_I18N_KEYS } from "@/lib/tracks";
 
 type DurationFilter = "all" | "short" | "medium" | "long";
 
-// Maps trackId (number from SanityCourse) to a URL-friendly slug used in ?track= query param
-// trackId values come from the Sanity schema and the on-chain program (u16)
-const TRACK_SLUGS: Record<number, string> = {
-  1: "solana-fundamentals",
-  2: "anchor-development",
-  3: "nft-gaming",
-  4: "defi-development",
-  5: "web3-frontend",
-  6: "advanced-protocol",
-};
-
 function toCourseCardData(
   course: SanityCourse,
-  enrollmentMap: Map<string, number>
+  enrollmentMap: Map<string, number>,
+  completedLessons: Record<string, Set<number>>,
+  resolveTrackName: (slug: string) => string | undefined
 ): CourseCardData & { trackSlug: string } {
   const totalMinutes =
     course.lessons?.reduce((sum, l) => sum + (l.estimatedMinutes ?? 0), 0) ?? 0;
+  const totalLessons = course.lessons?.length ?? 0;
+
+  // Only compute progress for courses the user has actually started
+  const courseCompleted = course.onChainCourseId
+    ? completedLessons[course.onChainCourseId]
+    : undefined;
+  const hasStarted = courseCompleted !== undefined && courseCompleted.size > 0;
+  const progress = hasStarted && totalLessons > 0
+    ? Math.round((courseCompleted.size / totalLessons) * 100)
+    : null;
+
+  const trackSlug = TRACK_SLUGS[course.trackId] ?? "other";
+
   return {
     slug: course.slug,
     title: course.title,
     description: course.description,
     thumbnail: course.thumbnail ?? null,
     difficulty: course.difficulty,
-    lessonCount: course.lessons?.length ?? 0,
+    lessonCount: totalLessons,
     xpPerLesson: course.xpPerLesson,
     totalEnrollments: enrollmentMap.get(course.onChainCourseId) ?? 0,
-    progress: null,
+    progress,
     tags: course.tags ?? [],
     totalMinutes,
-    trackSlug: TRACK_SLUGS[course.trackId] ?? "other",
+    trackSlug,
+    trackName: resolveTrackName(trackSlug),
     onChainCourseId: course.onChainCourseId,
   };
 }
@@ -79,6 +86,7 @@ export function CourseGrid({ courses, loading = false, error = false, initialTra
   const [duration, setDuration] = useState<DurationFilter>("all");
   const [track, setTrack] = useState<string>(initialTrack);
   const [enrollmentMap, setEnrollmentMap] = useState<Map<string, number>>(new Map());
+  const completedLessons = useProgressStore((s) => s.completedLessons);
 
   useEffect(() => {
     fetchAllCourses().then((onChainCourses) => {
@@ -92,9 +100,23 @@ export function CourseGrid({ courses, loading = false, error = false, initialTra
     });
   }, []);
 
+  // Resolve track name from courses.tracks.{i18nKey} (REQ-189/405)
+  const resolveTrackName = (slug: string): string | undefined => {
+    const trackId = Object.entries(TRACK_SLUGS).find(([, s]) => s === slug)?.[0];
+    if (!trackId) return undefined;
+    const i18nKey = TRACK_I18N_KEYS[Number(trackId)];
+    if (!i18nKey) return undefined;
+    try {
+      return t(`tracks.${i18nKey}`);
+    } catch {
+      return undefined;
+    }
+  };
+
   const cardData = useMemo(
-    () => courses.map((c) => toCourseCardData(c, enrollmentMap)),
-    [courses, enrollmentMap]
+    () => courses.map((c) => toCourseCardData(c, enrollmentMap, completedLessons, resolveTrackName)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [courses, enrollmentMap, completedLessons]
   );
 
   // Derive unique tags across all courses for the topic filter

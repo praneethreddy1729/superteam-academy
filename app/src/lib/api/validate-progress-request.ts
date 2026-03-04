@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { PublicKey } from "@solana/web3.js";
 import nacl from "tweetnacl";
 import { auth } from "@/lib/auth/config";
@@ -41,7 +41,7 @@ interface ValidatedRequest {
 }
 
 export async function validateProgressRequest(
-  request: Request,
+  request: NextRequest,
   options: { requireLessonIndex: boolean }
 ): Promise<ValidatedRequest | NextResponse> {
   const session = await auth();
@@ -52,6 +52,7 @@ export async function validateProgressRequest(
     );
   }
 
+  // Parse body first so we can compare learner against session wallet
   let body: unknown;
   try {
     body = await request.json();
@@ -74,6 +75,17 @@ export async function validateProgressRequest(
     return NextResponse.json(
       { error: { code: "INVALID_INPUT", message: "Invalid or missing learner address" } },
       { status: 400 }
+    );
+  }
+
+  // Verify session identity matches the learner wallet
+  const sessionWallet = session.user?.walletAddress;
+  const linkedWallet = request.cookies.get("academy_linked_wallet")?.value;
+  const userWallet = sessionWallet || linkedWallet;
+  if (!userWallet || userWallet !== learner) {
+    return NextResponse.json(
+      { error: { code: "FORBIDDEN", message: "Wallet does not match authenticated session" } },
+      { status: 403 }
     );
   }
 

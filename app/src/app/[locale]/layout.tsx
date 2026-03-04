@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-import { Sidebar } from "@/components/layout/Sidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
@@ -20,6 +19,7 @@ import { NavigationProgress } from "@/components/layout/NavigationProgress";
 import { OnboardingModal } from "@/components/onboarding/OnboardingModal";
 import { GlobalKeyboardShortcuts } from "@/components/ui/KeyboardShortcutsDialog";
 import { GlobalCommandPalette } from "@/components/search/CommandPalette";
+import { GlobalLevelUpModal } from "@/components/gamification/GlobalLevelUpModal";
 
 type Props = {
   children: React.ReactNode;
@@ -76,6 +76,7 @@ export default async function LocaleLayout({ children, params }: Props) {
     <html lang={locale} suppressHydrationWarning>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
         <link rel="preconnect" href="https://cdn.sanity.io" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://devnet.helius-rpc.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://arweave.net" />
@@ -100,30 +101,26 @@ export default async function LocaleLayout({ children, params }: Props) {
           disableTransitionOnChange
         >
           <SessionProvider>
-            <LazyWalletProvider>
-              <PostHogProvider>
-                <NextIntlClientProvider locale={locale} messages={messages}>
+            <PostHogProvider>
+              <NextIntlClientProvider locale={locale} messages={messages}>
+                <LazyWalletProvider>
                   <OnboardingModal />
                   <GlobalKeyboardShortcuts />
                   <GlobalCommandPalette />
-                  <div className="flex min-h-screen">
-                    {/* Desktop sidebar */}
-                    <Sidebar />
-                    {/* Main content area */}
-                    <div className="flex min-h-screen flex-1 flex-col sidebar-content-shift">
-                      <Header />
-                      <main id="main-content" className="flex-1 animate-fade-in-page pb-16 md:pb-0">
-                        {children}
-                      </main>
-                      <Footer />
-                    </div>
+                  <GlobalLevelUpModal />
+                  <div className="flex min-h-screen flex-col overflow-x-hidden">
+                    <Header />
+                    <main id="main-content" className="flex-1 animate-fade-in-page pb-16 md:pb-0">
+                      {children}
+                    </main>
+                    <Footer />
                     {/* Mobile bottom nav */}
                     <BottomNav />
                   </div>
                   <Toaster richColors position="bottom-right" />
-                </NextIntlClientProvider>
-              </PostHogProvider>
-            </LazyWalletProvider>
+                </LazyWalletProvider>
+              </NextIntlClientProvider>
+            </PostHogProvider>
           </SessionProvider>
         </ThemeProvider>
       </body>

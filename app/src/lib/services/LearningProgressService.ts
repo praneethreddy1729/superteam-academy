@@ -1,6 +1,6 @@
 import { useProgressStore } from "@/stores/progress-store";
 import { useActivityStore } from "@/stores/activity-store";
-import { trackLessonComplete } from "@/lib/analytics/events";
+import { trackLessonComplete, trackXpEarned } from "@/lib/analytics/events";
 import { checkAndTriggerAchievements } from "@/lib/services/AchievementTriggerService";
 
 // ---------------------------------------------------------------------------
@@ -16,6 +16,9 @@ export interface CompleteLessonParams {
   lessonIndex: number;
   lessonTitle?: string;
   xpEarned?: number;
+  moduleId?: string;
+  moduleIndex?: number;
+  lessonType?: "content" | "challenge";
   signMessage: SignMessageFn;
   /** Achievement trigger context — provide for auto-achievement detection */
   achievementCtx?: {
@@ -31,6 +34,10 @@ export interface FinalizeCourseParams {
   courseId: string;
   courseTitle?: string;
   xpPerCourseCompletion?: number;
+  /** XP awarded per lesson — used to compute dynamic completion bonus */
+  xpPerLesson?: number;
+  /** Total lessons in the course — used to compute dynamic completion bonus */
+  totalLessons?: number;
   signMessage: SignMessageFn;
   /** Achievement trigger context — provide for auto-achievement detection */
   achievementCtx?: {
@@ -48,11 +55,18 @@ export interface ProgressResult {
   signature: string;
 }
 
+export interface ModuleProgress {
+  moduleId: string;
+  completedLessons: number[];
+  totalLessons: number;
+}
+
 export interface CourseProgress {
   courseId: string;
   completedLessons: number[];
   totalCompleted: number;
   percentComplete: number;
+  modules?: ModuleProgress[];
 }
 
 export interface StreakData {
@@ -124,8 +138,18 @@ async function postProgress<T>(endpoint: string, body: object): Promise<T> {
   });
 
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error((data as Record<string, string>).error ?? `HTTP ${res.status}`);
+    const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+    // API returns { error: { code, message } } — extract the string message
+    const errObj = data.error;
+    const errMsg =
+      typeof errObj === "string"
+        ? errObj
+        : errObj && typeof errObj === "object" && "message" in errObj
+          ? String((errObj as Record<string, unknown>).message)
+          : typeof data.message === "string"
+            ? data.message
+            : `HTTP ${res.status}`;
+    throw new Error(errMsg);
   }
 
   return res.json() as Promise<T>;
@@ -172,6 +196,10 @@ export async function completeLessonWithProgress(
       { learner, courseId, lessonIndex, signature, timestamp }
     );
     trackLessonComplete(courseId, lessonIndex);
+    if (xpEarned > 0) {
+      const { xp: totalXp } = useProgressStore.getState();
+      trackXpEarned(xpEarned, "lesson", totalXp);
+    }
 
     // Fire achievement checks asynchronously — never awaited to avoid blocking
     if (achievementCtx) {
@@ -197,7 +225,7 @@ export async function completeLessonWithProgress(
 export async function finalizeCourseWithProgress(
   params: FinalizeCourseParams
 ): Promise<ProgressResult> {
-  const { learner, courseId, courseTitle, xpPerCourseCompletion, signMessage, achievementCtx } = params;
+  const { learner, courseId, courseTitle, xpPerCourseCompletion, xpPerLesson, totalLessons, signMessage, achievementCtx } = params;
 
   // Sign with timestamp for replay protection
   const timestamp = Date.now();
@@ -221,8 +249,14 @@ export async function finalizeCourseWithProgress(
       { learner, courseId, signature, timestamp }
     );
 
-    // Award course completion bonus XP (default 500 per bounty spec if not configured)
-    const completionXp = xpPerCourseCompletion ?? XP_RANGES.course.min;
+    // Award course completion bonus XP.
+    // If xpPerLesson and totalLessons are provided, compute dynamically:
+    //   floor((xpPerLesson * totalLessons) / 2)
+    // Otherwise fall back to the explicit xpPerCourseCompletion or the spec minimum.
+    const completionXp =
+      xpPerLesson !== undefined && totalLessons !== undefined && totalLessons > 0
+        ? Math.floor((xpPerLesson * totalLessons) / 2)
+        : (xpPerCourseCompletion ?? XP_RANGES.course.min);
     const { addBonusXp } = useProgressStore.getState();
     addBonusXp(completionXp, `course_completed:${courseId}`);
 
@@ -396,8 +430,14 @@ export async function claimAchievement(
     body: JSON.stringify({ achievementId, learner, signature, timestamp }),
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => "Unknown error");
-    return { success: false, error: text };
+    const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+    const errObj = data.error;
+    const errMsg =
+      typeof errObj === "string" ? errObj
+      : errObj && typeof errObj === "object" && "message" in errObj
+        ? String((errObj as Record<string, unknown>).message)
+        : `HTTP ${res.status}`;
+    return { success: false, error: errMsg };
   }
   const data = await res.json() as { success: boolean; signature?: string };
   return data;
@@ -434,8 +474,14 @@ export async function issueCredential(
     }),
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => "Unknown error");
-    return { success: false, error: text };
+    const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+    const errObj = data.error;
+    const errMsg =
+      typeof errObj === "string" ? errObj
+      : errObj && typeof errObj === "object" && "message" in errObj
+        ? String((errObj as Record<string, unknown>).message)
+        : `HTTP ${res.status}`;
+    return { success: false, error: errMsg };
   }
   const data = await res.json() as { success: boolean; signature?: string; credentialAsset?: string; error?: string };
   return data;

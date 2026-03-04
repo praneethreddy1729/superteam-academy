@@ -14,6 +14,7 @@ export const courseSchema = {
     { name: "onChainCourseId", title: "On-Chain Course ID", type: "string" },
     { name: "xpPerLesson", title: "XP Per Lesson", type: "number" },
     { name: "xpPerCourseCompletion", title: "Course Completion XP", type: "number", description: "Bonus XP awarded when learner completes entire course. Default: 500.", initialValue: 500, validation: (Rule: Rule) => Rule.min(0).max(5000) },
+    { name: "estimatedDuration", title: "Estimated Duration (minutes)", type: "number", description: "Total estimated minutes to complete the course." },
     { name: "tags", title: "Tags", type: "array", of: [{ type: "string" }] },
     { name: "prerequisites", title: "Prerequisites", type: "array", of: [{ type: "string" }] },
     { name: "instructor", title: "Instructor", type: "reference", to: [{ type: "instructor" }] },

@@ -71,7 +71,5 @@ export function handleApiError(err: unknown): ApiError {
     return new ApiError(ApiErrorCode.TRANSACTION_FAILED, err.message);
   }
 
-  const message =
-    err instanceof Error ? err.message : "An unexpected error occurred";
-  return new ApiError(ApiErrorCode.INTERNAL_ERROR, message);
+  return new ApiError(ApiErrorCode.INTERNAL_ERROR, "An unexpected error occurred");
 }

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { useAchievements } from "@/hooks/useAchievements";
 import { useNotificationStore } from "@/stores/notification-store";
 import { useProgressStore } from "@/stores/progress-store";
-import { ACHIEVEMENT_DEFINITIONS } from "@/lib/gamification/achievements";
+import { ACHIEVEMENT_DEFINITIONS, recordAchievementUnlockedAt } from "@/lib/gamification/achievements";
 import {
   checkAndTriggerAchievements,
   triggerHelperIfEligible,
@@ -86,6 +86,9 @@ export function useAchievementTrigger(): UseAchievementTriggerResult {
     (achievementId: string, xpReward: number) => {
       const def = ACHIEVEMENT_DEFINITIONS.find((d) => d.id === achievementId);
       if (!def) return;
+
+      // Persist unlock timestamp for "Earned X days ago" display (REQ-417)
+      recordAchievementUnlockedAt(achievementId);
 
       showAchievementToast(achievementId, xpReward);
 

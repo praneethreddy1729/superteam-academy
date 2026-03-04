@@ -17,9 +17,9 @@ const TRACK_NAMES: Record<number, string> = {
   1: "Solana Core",
   2: "Rust",
   3: "Anchor",
-  4: "Token Program",
+  4: "Frontend",
   5: "DeFi",
-  6: "NFTs",
+  6: "Security",
 };
 
 // All skill dimensions always shown on the radar (in display order).
@@ -73,25 +73,25 @@ export function SkillRadarChart({ completedLessons, courseTrackMap }: SkillRadar
   }
 
   return (
-    <div className="w-full" style={{ height: 300 }}>
+    <div className="w-full h-[250px] sm:h-[300px]">
       <ResponsiveContainer width="100%" height="100%">
-        <RadarChart data={data} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
-          <PolarGrid stroke="hsl(var(--border))" />
+        <RadarChart data={data} margin={{ top: 10, right: 20, bottom: 10, left: 20 }}>
+          <PolarGrid stroke="var(--color-border)" />
           <PolarAngleAxis
             dataKey="skill"
-            tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+            tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
           />
           <PolarRadiusAxis
             angle={30}
             domain={[0, 100]}
-            tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+            tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
             axisLine={false}
           />
           <Radar
             name={t("skills.title")}
             dataKey="value"
-            stroke="hsl(var(--primary))"
-            fill="hsl(var(--primary))"
+            stroke="var(--color-primary)"
+            fill="var(--color-primary)"
             fillOpacity={0.3}
           />
         </RadarChart>

@@ -156,14 +156,22 @@ export function CertificateView({ assetId }: Props) {
     publicKey !== null &&
     publicKey?.toBase58() === ownerAddress;
 
+  // Show profile name for the connected owner; fall back to truncated address
+  const profileName = isOwner
+    ? (typeof window !== "undefined"
+        ? localStorage.getItem("academy:profile-name") ?? null
+        : null)
+    : null;
+  const displayName = profileName ?? truncatedOwner;
+
   if (loading) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-12">
-        <Skeleton className="h-96 w-full rounded-2xl" />
-        <div className="mt-6 flex justify-center gap-3">
-          <Skeleton className="h-10 w-36" />
-          <Skeleton className="h-10 w-28" />
-          <Skeleton className="h-10 w-28" />
+        <Skeleton className="h-64 sm:h-96 w-full rounded-2xl" />
+        <div className="mt-6 flex flex-wrap justify-center gap-2 sm:gap-3">
+          <Skeleton className="h-10 w-28 sm:w-36" />
+          <Skeleton className="h-10 w-24 sm:w-28" />
+          <Skeleton className="h-10 w-24 sm:w-28" />
         </div>
       </div>
     );
@@ -183,7 +191,7 @@ export function CertificateView({ assetId }: Props) {
     <div className="mx-auto max-w-3xl px-4 py-12">
       <Card className="overflow-hidden">
         {/* Certificate visual */}
-        <div ref={certificateRef} className="relative bg-gradient-to-br from-primary/20 via-secondary/10 to-accent/20 p-12 text-center">
+        <div ref={certificateRef} className="relative bg-gradient-to-br from-primary/20 via-secondary/10 to-accent/20 p-6 sm:p-12 text-center">
           {/* Decorative rings */}
           <div className="absolute inset-0 overflow-hidden opacity-10">
             <div className="absolute -left-16 -top-16 h-64 w-64 rounded-full border-4 border-primary" />
@@ -201,15 +209,15 @@ export function CertificateView({ assetId }: Props) {
             <Award className="relative mx-auto mb-4 h-20 w-20 text-primary drop-shadow-lg" aria-hidden="true" />
           )}
 
-          <p className="relative text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+          <p className="relative text-xs sm:text-sm font-semibold uppercase tracking-widest text-muted-foreground">
             {tc("appName")}
           </p>
-          <h1 className="relative mt-2 text-3xl font-bold">{t("title")}</h1>
-          <p className="relative mt-3 text-xl text-foreground/80">{courseName}</p>
+          <h1 className="relative mt-2 text-2xl sm:text-3xl font-bold">{t("title")}</h1>
+          <p className="relative mt-3 text-lg sm:text-xl text-foreground/80">{courseName}</p>
 
-          {truncatedOwner && (
-            <p className="relative mt-3 text-sm font-medium text-muted-foreground font-mono">
-              {t("awardedTo")}: {truncatedOwner}
+          {displayName && (
+            <p className={`relative mt-3 text-sm font-medium text-muted-foreground${profileName ? "" : " font-mono"}`}>
+              {t("awardedTo")}: {displayName}
             </p>
           )}
 
@@ -220,8 +228,8 @@ export function CertificateView({ assetId }: Props) {
               </Badge>
             )}
             {xpAwarded && <Badge variant="outline">{xpAwarded} XP</Badge>}
-            <Badge variant="outline" className="font-mono text-xs">
-              {assetId.slice(0, 8)}...{assetId.slice(-8)}
+            <Badge variant="outline" className="font-mono text-[10px] sm:text-xs max-w-full truncate">
+              {assetId.slice(0, 6)}...{assetId.slice(-6)}
             </Badge>
           </div>
 
@@ -234,15 +242,19 @@ export function CertificateView({ assetId }: Props) {
 
         {/* Ownership details */}
         {ownerAddress && (
-          <div className="border-t px-6 py-4 space-y-2">
+          <div className="border-t px-4 sm:px-6 py-4 space-y-2">
             <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
               {t("ownership")}
             </p>
-            <div className="flex flex-wrap items-center gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2 text-sm min-w-0">
               <span className="text-muted-foreground">{t("ownedBy")}:</span>
-              <span className="font-mono">{ownerAddress.slice(0, 8)}...{ownerAddress.slice(-8)}</span>
+              {profileName ? (
+                <span className="truncate">{profileName}</span>
+              ) : (
+                <span className="font-mono truncate">{ownerAddress.slice(0, 8)}...{ownerAddress.slice(-8)}</span>
+              )}
               {isOwner && (
-                <Badge variant="secondary" className="gap-1">
+                <Badge variant="secondary" className="gap-1 shrink-0">
                   <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
                   {t("youOwnThis")}
                 </Badge>
@@ -255,8 +267,8 @@ export function CertificateView({ assetId }: Props) {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
               >
-                <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                {t("verifiedOnChain")}
+                <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
+                <span className="truncate">{t("verifiedOnChain")}</span>
               </a>
             </div>
           </div>
@@ -264,20 +276,20 @@ export function CertificateView({ assetId }: Props) {
 
         {/* Metadata URI */}
         {metadataUri && (
-          <div className="border-t px-6 py-4 space-y-2">
+          <div className="border-t px-4 sm:px-6 py-4 space-y-2">
             <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
               {t("metadataSection")}
             </p>
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="text-muted-foreground">{t("metadataUri")}:</span>
+            <div className="flex flex-wrap items-center gap-2 text-sm min-w-0">
+              <span className="text-muted-foreground shrink-0">{t("metadataUri")}:</span>
               <a
                 href={metadataUri}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-mono text-primary underline-offset-4 hover:underline truncate max-w-[260px]"
+                className="font-mono text-xs sm:text-sm text-primary underline-offset-4 hover:underline truncate max-w-[180px] sm:max-w-[260px]"
                 title={metadataUri}
               >
-                {metadataUri.slice(0, 24)}...{metadataUri.slice(-12)}
+                {metadataUri.slice(0, 20)}...{metadataUri.slice(-8)}
               </a>
               <button
                 type="button"
@@ -302,13 +314,14 @@ export function CertificateView({ assetId }: Props) {
         )}
 
         {/* Canvas-generated certificate download */}
-        <div className="border-t px-6 py-5">
+        <div className="border-t px-4 sm:px-6 py-5">
           <p className="mb-4 text-center text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             {t("download")}
           </p>
           <CertificateDownload
             courseName={courseName}
             ownerAddress={ownerAddress}
+            recipientName={profileName}
             completionDate={mintDate ?? null}
             xpEarned={xpAwarded ?? null}
             certificateUrl={typeof window !== "undefined" ? window.location.href : ""}
@@ -317,7 +330,7 @@ export function CertificateView({ assetId }: Props) {
         </div>
 
         {/* Action buttons */}
-        <CardContent className="flex flex-wrap justify-center gap-3 p-6">
+        <CardContent className="flex flex-wrap justify-center gap-2 sm:gap-3 p-4 sm:p-6">
           <Button variant="outline" className="gap-2" asChild>
             <a
               href={`https://explorer.solana.com/address/${assetId}?cluster=${SOLANA_NETWORK}`}
