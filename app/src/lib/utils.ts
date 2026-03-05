@@ -26,6 +26,17 @@ export function getLevelProgress(xp: number): number {
   return Math.round(((xp - currentLevelXp) / (nextLevelXp - currentLevelXp)) * 100);
 }
 
+/** Returns { xpIntoLevel, xpNeeded } for showing "X / Y XP to next level" */
+export function getLevelXpInfo(xp: number): { xpIntoLevel: number; xpNeeded: number } {
+  const level = getLevel(xp);
+  const currentLevelXp = level * level * 100;
+  const nextLevelXp = (level + 1) * (level + 1) * 100;
+  return {
+    xpIntoLevel: xp - currentLevelXp,
+    xpNeeded: nextLevelXp - currentLevelXp,
+  };
+}
+
 export const difficultyColors: Record<1 | 2 | 3, string> = {
   1: "bg-green-500/10 text-green-500 border-green-500/20",
   2: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",

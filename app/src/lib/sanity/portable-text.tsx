@@ -1,8 +1,8 @@
 import { PortableText, type PortableTextComponents } from "@portabletext/react";
 import imageUrlBuilder from "@sanity/image-url";
-import { Highlight, themes } from "prism-react-renderer";
 import { publicClient } from "@/lib/sanity/client";
 import { CodeCopyButton } from "@/components/shared/CodeCopyButton";
+import { ThemedCodeBlock } from "@/components/shared/ThemedCodeBlock";
 import type { PortableTextContent } from "@/lib/sanity/queries";
 
 const builder = imageUrlBuilder(publicClient);
@@ -26,44 +26,9 @@ const components: PortableTextComponents = {
       const url = urlFor(value).width(800).auto("format").url();
       return <img src={url} alt="" className="rounded-lg my-4 w-full" loading="lazy" />;
     },
-    codeBlock: ({ value }: { value: { code: string; language: string } }) => {
-      // Map Sanity language names to Prism language names
-      const languageMap: Record<string, string> = {
-        js: "javascript",
-        ts: "typescript",
-        jsx: "jsx",
-        tsx: "tsx",
-        sh: "bash",
-        shell: "bash",
-        rs: "rust",
-        py: "python",
-      };
-      const prismLanguage = languageMap[value.language] ?? value.language ?? "text";
-      return (
-        <div className="group relative my-4">
-          <div className="flex items-center justify-between rounded-t-lg bg-[#1e1e2e] px-4 py-2 text-xs text-muted-foreground">
-            <span className="font-mono">{value.language}</span>
-            <CodeCopyButton code={value.code} />
-          </div>
-          <Highlight theme={themes.vsDark} code={value.code} language={prismLanguage}>
-            {({ className, style, tokens, getLineProps, getTokenProps }) => (
-              <pre
-                className={`${className} overflow-x-auto rounded-b-lg p-4 font-mono text-sm`}
-                style={style}
-              >
-                {tokens.map((line, i) => (
-                  <div key={i} {...getLineProps({ line })}>
-                    {line.map((token, key) => (
-                      <span key={key} {...getTokenProps({ token })} />
-                    ))}
-                  </div>
-                ))}
-              </pre>
-            )}
-          </Highlight>
-        </div>
-      );
-    },
+    codeBlock: ({ value }: { value: { code: string; language: string } }) => (
+      <ThemedCodeBlock code={value.code} language={value.language} />
+    ),
     callout: ({ value }: { value: { type: string; text: string } }) => {
       const colors: Record<string, string> = {
         info: "border-blue-500 bg-blue-500/10",

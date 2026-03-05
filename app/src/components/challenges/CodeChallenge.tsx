@@ -704,7 +704,7 @@ export function CodeChallenge({ challenge: challengeProp, challengeId, standalon
           <MonacoDiffEditor
             height="100%"
             language={monacoLang}
-            theme={resolvedTheme === "dark" ? "vs-dark" : "light"}
+            theme={resolvedTheme === "light" ? "light" : "vs-dark"}
             original={diffCodeRef.current}
             modified={challenge.solutionCode}
             onMount={(editor) => {
@@ -731,7 +731,7 @@ export function CodeChallenge({ challenge: challengeProp, challengeId, standalon
           <MonacoEditor
             height="100%"
             language={monacoLang}
-            theme={resolvedTheme === "dark" ? "vs-dark" : "light"}
+            theme={resolvedTheme === "light" ? "light" : "vs-dark"}
             value={code}
             onChange={(v) => handleCodeChange(v ?? "")}
             onMount={handleEditorDidMount}

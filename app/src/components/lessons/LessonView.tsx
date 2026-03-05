@@ -17,6 +17,7 @@ import { useLessonComplete } from "@/hooks/useLessonComplete";
 import { useEnrollment } from "@/hooks/useEnrollment";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@/components/wallet/CustomWalletModalProvider";
+import { useSession } from "next-auth/react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useProgressStore } from "@/stores/progress-store";
 import { RichContent } from "@/lib/sanity/portable-text";
@@ -241,6 +242,8 @@ export function LessonView({ lesson, course }: LessonViewProps) {
   const { completing, markComplete } = useLessonComplete();
   const { connected } = useWallet();
   const { setVisible } = useWalletModal();
+  const { data: session } = useSession();
+  const isWalletAuthenticated = connected || !!session?.user?.walletAddress;
   const isLessonCompleteOptimistic = useProgressStore((s) => s.isLessonComplete);
   const streakDays = useProgressStore((s) => s.streakDays);
   const lastActivityDate = useProgressStore((s) => s.lastActivityDate);
@@ -427,7 +430,7 @@ export function LessonView({ lesson, course }: LessonViewProps) {
         </div>
 
         {!currentLessonCompleted && (
-          connected ? (
+          isWalletAuthenticated ? (
             <Button
               onClick={handleMarkComplete}
               disabled={completing}
@@ -506,10 +509,10 @@ export function LessonView({ lesson, course }: LessonViewProps) {
       </Tabs>
 
       {/* Collapsible discussion bottom panel */}
-      <div className="shrink-0 border-t border-primary/30 bg-[#101018]">
+      <div className="shrink-0 border-t border-primary/30 bg-card">
         <button
           onClick={() => setDiscussionOpen((prev) => !prev)}
-          className="flex w-full items-center justify-between px-4 py-2.5 text-sm font-medium text-foreground/90 hover:bg-[#161622] transition-colors"
+          className="flex w-full items-center justify-between px-4 py-2.5 text-sm font-medium text-foreground/90 hover:bg-muted transition-colors"
           aria-expanded={discussionOpen}
           aria-controls="discussion-panel"
         >

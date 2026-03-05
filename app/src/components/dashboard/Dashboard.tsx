@@ -15,7 +15,7 @@ import { Trophy, Zap, BookOpen, Flame, Star, CheckCircle2, ChevronRight, Wallet,
 import { AchievementBadges } from "@/components/gamification/AchievementBadges";
 import { useAchievements } from "@/hooks/useAchievements";
 import { cn } from "@/lib/utils";
-import { getLevel, getLevelProgress, formatXp, truncateAddress, difficultyColors } from "@/lib/utils";
+import { getLevel, getLevelProgress, getLevelXpInfo, formatXp, truncateAddress, difficultyColors } from "@/lib/utils";
 import { EmptyState } from "@/components/shared/empty-state";
 import { useXpBalance } from "@/hooks/useXpBalance";
 import { useProgressStore } from "@/stores/progress-store";
@@ -411,65 +411,78 @@ export function Dashboard({ courses }: DashboardProps) {
           {xpLoading ? (
             <Skeleton className="h-32 w-24 rounded-2xl shrink-0" />
           ) : (
-            <div className="flex shrink-0 flex-col items-center gap-3 self-center" aria-label={`${t("level")} ${level}, ${levelProgress}% ${t("levelProgress")}`}>
-              <div className="relative h-24 w-24">
-                {/* Outer glow for active progress */}
-                {levelProgress > 0 && (
-                  <div className="absolute inset-0 rounded-full bg-[#14F195]/10 dark:bg-[#14F195]/8 blur-md xp-ring-glow" aria-hidden="true" />
-                )}
-                <svg
-                  viewBox="0 0 100 100"
-                  className="relative h-full w-full -rotate-90"
-                  aria-hidden="true"
-                >
-                  {/* Gradient definitions */}
-                  <defs>
-                    <linearGradient id="xp-ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" className="[stop-color:#14F195]" />
-                      <stop offset="100%" className="[stop-color:#0d9668]" />
-                    </linearGradient>
-                    <filter id="xp-ring-glow-filter">
-                      <feGaussianBlur stdDeviation="2" result="blur" />
-                      <feMerge>
-                        <feMergeNode in="blur" />
-                        <feMergeNode in="SourceGraphic" />
-                      </feMerge>
-                    </filter>
-                  </defs>
-                  {/* Track ring */}
-                  <circle
-                    cx="50" cy="50" r="42"
-                    fill="none"
-                    className="stroke-muted/50"
-                    strokeWidth="6"
-                  />
-                  {/* Progress ring */}
-                  <circle
-                    cx="50" cy="50" r="42"
-                    fill="none"
-                    stroke="url(#xp-ring-grad)"
-                    strokeWidth="6"
-                    strokeLinecap="round"
-                    filter={levelProgress > 0 ? "url(#xp-ring-glow-filter)" : undefined}
-                    className={cn("xp-ring-progress", levelProgress > 0 && "xp-ring-shimmer")}
-                    style={{ "--ring-offset": `${263.9 - (levelProgress / 100) * 263.9}` } as React.CSSProperties}
-                  />
-                </svg>
-                {/* Centre label */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/70">
-                    {t("level")}
-                  </span>
-                  <span className="text-3xl font-extrabold leading-none tabular-nums mt-0.5">{level}</span>
+            (() => {
+              const { xpIntoLevel, xpNeeded } = getLevelXpInfo(xp);
+              const RADIUS = 42;
+              const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+              const strokeOffset = CIRCUMFERENCE - (levelProgress / 100) * CIRCUMFERENCE;
+
+              return (
+                <div className="flex shrink-0 flex-col items-center gap-2 self-center" aria-label={`Level ${level}, ${xpIntoLevel} of ${xpNeeded} XP to level ${level + 1}`}>
+                  <div className="relative h-28 w-28">
+                    {/* Outer glow */}
+                    <div
+                      className="absolute inset-0 rounded-full blur-xl transition-opacity duration-500"
+                      style={{ background: "radial-gradient(circle, rgba(20,241,149,0.15) 0%, transparent 70%)", opacity: levelProgress > 0 ? 1 : 0.3 }}
+                      aria-hidden="true"
+                    />
+                    <svg
+                      viewBox="0 0 100 100"
+                      className="relative h-full w-full -rotate-90"
+                      aria-hidden="true"
+                    >
+                      <defs>
+                        <linearGradient id="xp-ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#14F195" />
+                          <stop offset="100%" stopColor="#0ea5e9" />
+                        </linearGradient>
+                        <filter id="xp-ring-glow-filter">
+                          <feGaussianBlur stdDeviation="2.5" result="blur" />
+                          <feMerge>
+                            <feMergeNode in="blur" />
+                            <feMergeNode in="SourceGraphic" />
+                          </feMerge>
+                        </filter>
+                      </defs>
+                      {/* Track ring */}
+                      <circle
+                        cx="50" cy="50" r={RADIUS}
+                        fill="none"
+                        className="dark:stroke-white/[0.06] stroke-black/[0.08]"
+                        strokeWidth="5"
+                      />
+                      {/* Progress ring */}
+                      <circle
+                        cx="50" cy="50" r={RADIUS}
+                        fill="none"
+                        stroke="url(#xp-ring-grad)"
+                        strokeWidth="5"
+                        strokeLinecap="round"
+                        strokeDasharray={CIRCUMFERENCE}
+                        strokeDashoffset={strokeOffset}
+                        filter={levelProgress > 0 ? "url(#xp-ring-glow-filter)" : undefined}
+                        className="transition-[stroke-dashoffset] duration-700 ease-out"
+                      />
+                    </svg>
+                    {/* Centre label */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-3xl font-extrabold leading-none tabular-nums text-[#14F195] drop-shadow-[0_0_8px_rgba(20,241,149,0.3)]">
+                        {level}
+                      </span>
+                      <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                        Level
+                      </span>
+                    </div>
+                  </div>
+                  {/* XP progress subtitle */}
+                  <p className="text-[11px] tabular-nums text-muted-foreground text-center">
+                    <span className="font-semibold text-foreground">{formatXp(xpIntoLevel)}</span>
+                    <span className="text-muted-foreground/60"> / {formatXp(xpNeeded)} XP </span>
+                    <span className="text-muted-foreground/40">to Level {level + 1}</span>
+                  </p>
                 </div>
-              </div>
-              {/* Progress info below the circle */}
-              <p className="text-[11px] tabular-nums text-muted-foreground/50">
-                {levelProgress}%
-                <span className="mx-1 text-muted-foreground/30">&rarr;</span>
-                {t("level")} {level + 1}
-              </p>
-            </div>
+              );
+            })()
           )}
         </div>
       </div>

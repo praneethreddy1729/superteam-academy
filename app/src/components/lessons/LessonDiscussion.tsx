@@ -186,7 +186,7 @@ function Avatar({ name, color, size = "md" }: { name: string; color: string; siz
   return (
     <div
       className={cn(
-        "shrink-0 rounded-full flex items-center justify-center font-bold text-[#08080C]",
+        "shrink-0 rounded-full flex items-center justify-center font-bold text-background",
         sizeClass
       )}
       style={{ backgroundColor: color }}
@@ -280,7 +280,7 @@ function DiscussionCard({
   return (
     <div
       className={cn(
-        "rounded-xl border bg-[#101018] transition-colors",
+        "rounded-xl border bg-card transition-colors",
         expanded ? "border-primary/40" : "border-border/40 hover:border-border/70"
       )}
     >
@@ -477,7 +477,7 @@ export function LessonDiscussion({ lessonSlug, courseSlug }: LessonDiscussionPro
 
       {/* New post form or sign-in prompt */}
       {session ? (
-        <div className="mb-6 rounded-xl border border-border/40 bg-[#101018] p-4 space-y-3">
+        <div className="mb-6 rounded-xl border border-border/40 bg-card p-4 space-y-3">
           {/* Type selector */}
           <div className="flex gap-2">
             {(["question", "discussion"] as const).map((type) => (
@@ -518,7 +518,7 @@ export function LessonDiscussion({ lessonSlug, courseSlug }: LessonDiscussionPro
           </div>
         </div>
       ) : (
-        <div className="mb-6 rounded-xl border border-border/40 bg-[#101018] p-4 flex items-center justify-between gap-4">
+        <div className="mb-6 rounded-xl border border-border/40 bg-card p-4 flex items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">{t("askQuestion")}</p>
           <Link href="/auth/signin">
             <Button variant="outline" size="sm" className="shrink-0 gap-1.5">
@@ -542,7 +542,7 @@ export function LessonDiscussion({ lessonSlug, courseSlug }: LessonDiscussionPro
               className={cn(
                 "rounded-full px-3 py-1 text-xs font-medium border transition-colors",
                 sort === key
-                  ? "border-primary bg-primary text-[#08080C]"
+                  ? "border-primary bg-primary text-primary-foreground"
                   : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground"
               )}
             >
