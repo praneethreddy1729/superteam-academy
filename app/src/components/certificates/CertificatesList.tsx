@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { useSession } from "next-auth/react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Link } from "@/i18n/routing";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,7 +33,9 @@ function CertificateCardSkeleton() {
 export function CertificatesList() {
   const t = useTranslations("certificatesPage");
   const tc = useTranslations("common");
+  const { data: session } = useSession();
   const { publicKey } = useWallet();
+  const isWalletAuthenticated = !!publicKey || !!session?.user?.walletAddress;
   const { credentials, loading, error } = useCredentials();
 
   const breadcrumbs = (
@@ -46,7 +49,7 @@ export function CertificatesList() {
   );
 
   // No wallet connected
-  if (!publicKey) {
+  if (!isWalletAuthenticated) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-12">
         {breadcrumbs}

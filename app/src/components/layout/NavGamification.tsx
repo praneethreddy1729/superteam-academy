@@ -1,5 +1,6 @@
 "use client";
 
+import { useSession } from "next-auth/react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useXpBalance } from "@/hooks/useXpBalance";
 import { useProgressStore } from "@/stores/progress-store";
@@ -8,11 +9,13 @@ import { Flame, Zap, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 
 export function NavGamification() {
+    const { data: session } = useSession();
     const { connected } = useWallet();
     const { xp } = useXpBalance();
     const { streakDays } = useProgressStore();
+    const isWalletAuthenticated = connected || !!session?.user?.walletAddress;
 
-    if (!connected) return null;
+    if (!isWalletAuthenticated) return null;
 
     const currentLevel = getLevel(xp);
 

@@ -173,6 +173,7 @@ export function Dashboard({ courses }: DashboardProps) {
   const { data: session, status: sessionStatus } = useSession();
   const { connected, publicKey } = useWallet();
   const { setVisible: setWalletModalVisible } = useWalletModal();
+  const isWalletAuthenticated = connected || !!session?.user?.walletAddress;
   const { xp, loading: xpLoading } = useXpBalance();
   const { streakDays, completedLessons, streakFreezeCount, streakFreezeActive } = useProgressStore();
   const { activities } = useActivityStore();
@@ -256,7 +257,7 @@ export function Dashboard({ courses }: DashboardProps) {
     );
   }
 
-  if (!connected) {
+  if (!isWalletAuthenticated) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-8">
         <div className="mb-8 rounded-xl border border-primary/20 bg-gradient-to-r from-primary/5 to-secondary/5 p-6 text-center">
@@ -330,9 +331,9 @@ export function Dashboard({ courses }: DashboardProps) {
           {/* Left — identity */}
           <div className="min-w-0">
             <h1 className="text-2xl font-bold tracking-tight">{t("welcome")}</h1>
-            {publicKey && (
+            {(publicKey || session?.user?.walletAddress) && (
               <p className="mt-1 text-sm text-muted-foreground font-mono tracking-wider">
-                {truncateAddress(publicKey.toBase58(), 6)}
+                {truncateAddress(publicKey?.toBase58() ?? session?.user?.walletAddress ?? "", 6)}
               </p>
             )}
 

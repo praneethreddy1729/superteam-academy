@@ -166,13 +166,14 @@ export function AdminDashboard() {
   const tc = useTranslations("common");
   const { data: session, status: sessionStatus } = useSession();
   const { connected } = useWallet();
+  const isWalletAuthenticated = connected || !!session?.user?.walletAddress;
 
   const [courses, setCourses] = useState<OnChainCourse[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!connected) {
+    if (!isWalletAuthenticated) {
       setLoading(false);
       return;
     }
@@ -226,7 +227,7 @@ export function AdminDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [connected]);
+  }, [isWalletAuthenticated]);
 
   // ── Auth + authorization gate ──────────────────────────────────────────────
 
@@ -283,7 +284,7 @@ export function AdminDashboard() {
     );
   }
 
-  if (!connected) {
+  if (!isWalletAuthenticated) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-8">
         <div className="rounded-xl border border-primary/20 bg-gradient-to-r from-primary/5 to-secondary/5 p-6 text-center">

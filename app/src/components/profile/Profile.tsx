@@ -126,6 +126,7 @@ export function Profile() {
   const { data: session, status: sessionStatus } = useSession();
   const { publicKey, connected } = useWallet();
   const { setVisible: setWalletModalVisible } = useWalletModal();
+  const isWalletAuthenticated = connected || !!session?.user?.walletAddress;
   const [copied, setCopied] = useState(false);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const bioTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -224,9 +225,11 @@ export function Profile() {
     ? new Intl.DateTimeFormat(locale, { year: "numeric", month: "long", day: "numeric" }).format(new Date(joinDate))
     : null;
 
+  const walletAddress = publicKey?.toBase58() ?? session?.user?.walletAddress ?? null;
+
   const copyAddress = () => {
-    if (publicKey) {
-      navigator.clipboard.writeText(publicKey.toBase58()).catch(() => {});
+    if (walletAddress) {
+      navigator.clipboard.writeText(walletAddress).catch(() => {});
       clearTimeout(copyTimerRef.current);
       setCopied(true);
       copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
@@ -276,7 +279,7 @@ export function Profile() {
     );
   }
 
-  if (!connected) {
+  if (!isWalletAuthenticated) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-20">
         <EmptyState
@@ -327,10 +330,10 @@ export function Profile() {
               {profileName ? (
                 <h2 className="text-xl font-bold">{profileName}</h2>
               ) : null}
-              {publicKey && (
+              {(publicKey || session?.user?.walletAddress) && (
                 <div className="flex items-center justify-center gap-2 sm:justify-start">
                   <code className="text-sm font-mono text-muted-foreground">
-                    {truncateAddress(publicKey.toBase58(), 8)}
+                    {truncateAddress(publicKey?.toBase58() ?? session?.user?.walletAddress ?? "", 8)}
                   </code>
                   <TooltipProvider>
                     <Tooltip>
@@ -354,7 +357,7 @@ export function Profile() {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <a
-                          href={`https://explorer.solana.com/address/${publicKey.toBase58()}?cluster=${SOLANA_NETWORK}`}
+                          href={`https://explorer.solana.com/address/${walletAddress}?cluster=${SOLANA_NETWORK}`}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
